@@ -46,9 +46,7 @@
       {{ ic.icon('search') }}
       <input id="riderSearch" placeholder="Search rider..." oninput="filterRiders()">
     </div>
-    <a href="{{ url_for('riders') }}" class="btn btn-primary">
-      {{ ic.icon('plus') }} Add Rider
-    </a>
+    <span class="badge badge-blue">{{ riders|length }} total</span>
   </div>
 
   <table class="data" id="riderTable">
@@ -81,24 +79,13 @@
           {{ r.latitude }}, {{ r.longitude }}
         </td>
         <td>
-          <div style="display:flex; gap:8px;">
-            <!-- Edit Button -->
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <a href="{{ url_for('edit_rider', rider_id=r.id) }}" class="btn btn-sm btn-outline">
               Edit
             </a>
-
-            <!-- View Button -->
             <a href="{{ url_for('view_rider', rider_id=r.id) }}" class="btn btn-sm btn-outline">
               View
             </a>
-
-            <!-- Optional: Keep Delete if you still want it -->
-            <!--
-            <form method="post" action="{{ url_for('delete_rider', rider_id=r.id) }}" 
-                  onsubmit="return confirm('Delete this rider?')" style="display:inline;">
-              <button class="btn btn-sm btn-danger-ghost">Delete</button>
-            </form>
-            -->
           </div>
         </td>
       </tr>

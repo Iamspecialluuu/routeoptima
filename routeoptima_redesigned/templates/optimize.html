@@ -53,23 +53,54 @@
 const HAS_GOOGLE = {{ 'true' if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' else 'false' }};
 const DEPOT = {lat:4.8156, lng:7.0498};
 let gmap, dirService, dirRenderer, lmap, lLayer;
+let usingGoogle = false, mapReady = false;
 
 function initGoogleMap(){
-  gmap = new google.maps.Map(document.getElementById('map'), {center:DEPOT, zoom:12, disableDefaultUI:false});
-  dirService = new google.maps.DirectionsService();
-  dirRenderer = new google.maps.DirectionsRenderer({map:gmap, suppressMarkers:false});
+  try{
+    gmap = new google.maps.Map(document.getElementById('map'), {center:DEPOT, zoom:12, disableDefaultUI:false});
+    dirService = new google.maps.DirectionsService();
+    dirRenderer = new google.maps.DirectionsRenderer({map:gmap, suppressMarkers:false});
+    usingGoogle = true; mapReady = true;
+  }catch(e){ console.warn('Google Maps failed to init, falling back:', e); fallbackToLeaflet(); }
 }
 function initLeafletMap(){
-  lmap = L.map('map').setView([DEPOT.lat, DEPOT.lng], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution:'&copy; OpenStreetMap contributors', maxZoom:19
-  }).addTo(lmap);
-  lLayer = L.layerGroup().addTo(lmap);
+  if(typeof L === 'undefined'){ mapFailed(); return; }
+  try{
+    lmap = L.map('map').setView([DEPOT.lat, DEPOT.lng], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'&copy; OpenStreetMap contributors', maxZoom:19
+    }).addTo(lmap);
+    lLayer = L.layerGroup().addTo(lmap);
+    usingGoogle = false; mapReady = true;
+    setTimeout(()=>lmap.invalidateSize(), 200);
+    window.addEventListener('resize', ()=>lmap && lmap.invalidateSize());
+  }catch(e){ console.warn('Leaflet failed to init:', e); mapFailed(); }
 }
-window.addEventListener('DOMContentLoaded', () => { if(!HAS_GOOGLE) initLeafletMap(); });
+function fallbackToLeaflet(){
+  // load Leaflet dynamically if it wasn't already loaded (Google path)
+  if(typeof L !== 'undefined'){ initLeafletMap(); return; }
+  const css = document.createElement('link'); css.rel='stylesheet'; css.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(css);
+  const js = document.createElement('script'); js.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+  js.onload = initLeafletMap; js.onerror = mapFailed;
+  document.head.appendChild(js);
+}
+function mapFailed(){
+  const el = document.getElementById('map');
+  if(el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:13.5px;text-align:center;padding:20px">Map preview is unavailable right now — the route results below are still accurate.</div>';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if(HAS_GOOGLE){
+    // if Google's callback hasn't fired within 4s (bad key, billing, referrer block), fall back
+    setTimeout(()=>{ if(!mapReady) fallbackToLeaflet(); }, 4000);
+  } else {
+    initLeafletMap();
+  }
+});
 
 function drawGoogleRoute(route){
-  if(route.length < 2) return;
+  if(route.length < 2 || !dirService) return;
   const wp = route.slice(1,-1).map(x=>({location:{lat:x.latitude,lng:x.longitude}, stopover:true}));
   dirService.route({
     origin:{lat:route[0].latitude,lng:route[0].longitude},
@@ -78,6 +109,7 @@ function drawGoogleRoute(route){
   }, (res,status)=>{ if(status==='OK') dirRenderer.setDirections(res); });
 }
 function drawLeafletRoute(route){
+  if(!lmap || !lLayer) return;
   lLayer.clearLayers();
   const latlngs = route.map(r=>[r.latitude, r.longitude]);
   L.polyline(latlngs, {color:'#3647c9', weight:4, opacity:.85}).addTo(lLayer);
@@ -89,6 +121,12 @@ function drawLeafletRoute(route){
     }).bindPopup((i===route.length-1?'Return to Depot':(i+1)+'. '+r.customer_name)).addTo(lLayer);
   });
   if(latlngs.length) lmap.fitBounds(latlngs, {padding:[30,30]});
+}
+function drawRoute(route){
+  // map drawing is best-effort and must never affect the results panel above
+  try{
+    if(usingGoogle) drawGoogleRoute(route); else drawLeafletRoute(route);
+  }catch(e){ console.warn('Map draw failed (results are still valid):', e); }
 }
 
 document.getElementById('go').onclick = async () => {
@@ -117,7 +155,7 @@ document.getElementById('go').onclick = async () => {
       `<li><span class="n">${i+1}</span>${(i===d.route.length-1)?'Return to Depot':x.customer_name+' — '+x.address}</li>`
     ).join('');
 
-    if(HAS_GOOGLE) drawGoogleRoute(d.route); else drawLeafletRoute(d.route);
+    drawRoute(d.route);
   }catch(x){
     err.textContent = x.message; err.style.display='block';
   }

@@ -377,9 +377,7 @@ table.data tr:hover td{background:#fbfbfe}
 /* ============================================================
    Landing (public index) — optional, matches Figure 4.1
    ============================================================ */
-/* ============================================================
-   Landing (public index) — redesigned to match target
-   ============================================================ */
+
 .hero-wrap {
   background: var(--surface);
 }

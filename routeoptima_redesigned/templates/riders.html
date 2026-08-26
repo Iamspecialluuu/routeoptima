@@ -3,59 +3,121 @@
 {% block content %}
 
 <div class="card card-pad" style="margin-bottom:18px">
-  <div class="section-title"><div><h2>Add a rider</h2><p>Register a new dispatch rider and their starting location</p></div></div>
+  <div class="section-title">
+    <div>
+      <h2>Add a rider</h2>
+      <p>Register a new dispatch rider and their starting location</p>
+    </div>
+  </div>
   <form method="post">
     <div class="form-row">
-      <div><label class="f-label">Name</label><input class="f-input" name="name" placeholder="e.g. Chinedu Okafor" required></div>
-      <div><label class="f-label">Phone</label><input class="f-input" name="phone" placeholder="0803 000 0001" required></div>
-      <div><label class="f-label">Status</label>
+      <div>
+        <label class="f-label">Name</label>
+        <input class="f-input" name="name" placeholder="e.g. Chinedu Okafor" required>
+      </div>
+      <div>
+        <label class="f-label">Phone</label>
+        <input class="f-input" name="phone" placeholder="0803 000 0001" required>
+      </div>
+      <div>
+        <label class="f-label">Status</label>
         <select class="f-input" name="status">
-          <option>Available</option><option>On Delivery</option><option>Offline</option>
+          <option>Available</option>
+          <option>On Delivery</option>
+          <option>Offline</option>
         </select>
       </div>
-      <div><label class="f-label">Latitude</label><input class="f-input" name="latitude" placeholder="4.8156" required></div>
-      <div><label class="f-label">Longitude</label><input class="f-input" name="longitude" placeholder="7.0498" required></div>
+      <div>
+        <label class="f-label">Latitude</label>
+        <input class="f-input" name="latitude" placeholder="4.8156" required>
+      </div>
+      <div>
+        <label class="f-label">Longitude</label>
+        <input class="f-input" name="longitude" placeholder="7.0498" required>
+      </div>
     </div>
-    <button class="btn btn-primary">{{ic.icon('plus')}}Add Rider</button>
+    <button class="btn btn-primary">{{ ic.icon('plus') }} Add Rider</button>
   </form>
 </div>
 
 <div class="table-card">
   <div class="table-toolbar">
-    <div class="search-box">{{ic.icon('search')}}<input id="riderSearch" placeholder="Search rider..." oninput="filterRiders()"></div>
-    <span class="badge badge-blue">{{riders|length}} total</span>
+    <div class="search-box">
+      {{ ic.icon('search') }}
+      <input id="riderSearch" placeholder="Search rider..." oninput="filterRiders()">
+    </div>
+    <a href="{{ url_for('riders') }}" class="btn btn-primary">
+      {{ ic.icon('plus') }} Add Rider
+    </a>
   </div>
+
   <table class="data" id="riderTable">
-    <tr><th>#</th><th>Rider</th><th>Phone</th><th>Status</th><th>Coordinates</th><th>Action</th></tr>
-    {% for r in riders %}
-    <tr>
-      <td>{{r.id}}</td>
-      <td style="font-weight:700">{{r.name}}</td>
-      <td class="mono">{{r.phone}}</td>
-      <td>
-        {% if r.status=='Available' %}<span class="badge badge-green">Available</span>
-        {% elif r.status=='On Delivery' %}<span class="badge badge-amber">On Delivery</span>
-        {% else %}<span class="badge badge-grey">Offline</span>{% endif %}
-      </td>
-      <td class="mono" style="color:var(--text-muted)">{{r.latitude}}, {{r.longitude}}</td>
-      <td>
-        <form method="post" action="{{url_for('delete_rider',rider_id=r.id)}}" onsubmit="return confirm('Delete this rider?')">
-          <button class="btn btn-sm btn-danger-ghost">Delete</button>
-        </form>
-      </td>
-    </tr>
-    {% else %}
-    <tr class="empty-row"><td colspan="6">No riders yet — add your first rider above.</td></tr>
-    {% endfor %}
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Rider</th>
+        <th>Phone</th>
+        <th>Status</th>
+        <th>Coordinates</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in riders %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td style="font-weight:700">{{ r.name }}</td>
+        <td class="mono">{{ r.phone }}</td>
+        <td>
+          {% if r.status == 'Available' %}
+            <span class="badge badge-green">Online</span>
+          {% elif r.status == 'On Delivery' %}
+            <span class="badge badge-amber">On Delivery</span>
+          {% else %}
+            <span class="badge badge-grey">Offline</span>
+          {% endif %}
+        </td>
+        <td class="mono" style="color:var(--text-muted)">
+          {{ r.latitude }}, {{ r.longitude }}
+        </td>
+        <td>
+          <div style="display:flex; gap:8px;">
+            <!-- Edit Button -->
+            <a href="{{ url_for('edit_rider', rider_id=r.id) }}" class="btn btn-sm btn-outline">
+              Edit
+            </a>
+
+            <!-- View Button -->
+            <a href="{{ url_for('view_rider', rider_id=r.id) }}" class="btn btn-sm btn-outline">
+              View
+            </a>
+
+            <!-- Optional: Keep Delete if you still want it -->
+            <!--
+            <form method="post" action="{{ url_for('delete_rider', rider_id=r.id) }}" 
+                  onsubmit="return confirm('Delete this rider?')" style="display:inline;">
+              <button class="btn btn-sm btn-danger-ghost">Delete</button>
+            </form>
+            -->
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr class="empty-row">
+        <td colspan="6">No riders yet — add your first rider above.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
   </table>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-function filterRiders(){
-  const q=document.getElementById('riderSearch').value.toLowerCase();
-  document.querySelectorAll('#riderTable tr:not(:first-child)').forEach(row=>{
+function filterRiders() {
+  const q = document.getElementById('riderSearch').value.toLowerCase();
+  document.querySelectorAll('#riderTable tbody tr').forEach(row => {
     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 }

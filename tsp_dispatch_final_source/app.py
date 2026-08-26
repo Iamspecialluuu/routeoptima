@@ -131,6 +131,7 @@ def history(): return render_template('history.html',history=db().execute('SELEC
 @app.route('/backend')
 @login_required
 def backend(): return render_template('backend.html')
+with app.app_context(): init_db()
+
 if __name__=='__main__':
-    with app.app_context(): init_db()
-    app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)),debug=True)
+    app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)),debug=False)

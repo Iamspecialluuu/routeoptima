@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% import '_icons.html' as ic %}
+
+{% block head %}
+{% if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' %}
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{google_maps_api_key}}&callback=initGoogleMap"></script>
+{% else %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-split">
+  <div class="card card-pad">
+    <label class="f-label">Algorithm</label>
+    <select id="algorithm" class="f-input" style="margin-bottom:18px">
+      <option value="auto">Automatic</option>
+      <option value="exact">Exact TSP</option>
+      <option value="nearest">Nearest Neighbour</option>
+    </select>
+
+    <label class="f-label">Delivery stops</label>
+    <div style="max-height:340px;overflow:auto;margin-top:8px">
+      {% for d in deliveries %}
+      <label class="stop-check">
+        <input class="delivery-check" type="checkbox" value="{{d.id}}" data-lat="{{d.latitude}}" data-lng="{{d.longitude}}" data-name="{{d.customer_name}}">
+        <span><span class="t">{{d.customer_name}}</span><br><span class="s">{{d.address}}</span></span>
+      </label>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:13.5px">No pending deliveries to optimize.</p>
+      {% endfor %}
+    </div>
+
+    <button id="go" class="btn btn-primary btn-block" style="margin-top:16px">{{ic.icon('optimize')}}Calculate Optimized Route</button>
+    <div id="err" class="flash flash-danger" style="display:none;margin-top:12px"></div>
+  </div>
+
+  <div class="map-col">
+    <div id="map"></div>
+  </div>
+</div>
+
+<div id="results" class="card card-pad" style="margin-top:16px;display:none">
+  <div class="section-title"><div><h2>Optimization Result</h2><p>Shortest visiting order for the selected stops</p></div></div>
+  <div id="metrics" class="grid grid-4"></div>
+  <ol id="route-list"></ol>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const HAS_GOOGLE = {{ 'true' if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' else 'false' }};
+const DEPOT = {lat:4.8156, lng:7.0498};
+let gmap, dirService, dirRenderer, lmap, lLayer;
+
+function initGoogleMap(){
+  gmap = new google.maps.Map(document.getElementById('map'), {center:DEPOT, zoom:12, disableDefaultUI:false});
+  dirService = new google.maps.DirectionsService();
+  dirRenderer = new google.maps.DirectionsRenderer({map:gmap, suppressMarkers:false});
+}
+function initLeafletMap(){
+  lmap = L.map('map').setView([DEPOT.lat, DEPOT.lng], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'&copy; OpenStreetMap contributors', maxZoom:19
+  }).addTo(lmap);
+  lLayer = L.layerGroup().addTo(lmap);
+}
+window.addEventListener('DOMContentLoaded', () => { if(!HAS_GOOGLE) initLeafletMap(); });
+
+function drawGoogleRoute(route){
+  if(route.length < 2) return;
+  const wp = route.slice(1,-1).map(x=>({location:{lat:x.latitude,lng:x.longitude}, stopover:true}));
+  dirService.route({
+    origin:{lat:route[0].latitude,lng:route[0].longitude},
+    destination:{lat:route[route.length-1].latitude,lng:route[route.length-1].longitude},
+    waypoints:wp, travelMode:google.maps.TravelMode.DRIVING
+  }, (res,status)=>{ if(status==='OK') dirRenderer.setDirections(res); });
+}
+function drawLeafletRoute(route){
+  lLayer.clearLayers();
+  const latlngs = route.map(r=>[r.latitude, r.longitude]);
+  L.polyline(latlngs, {color:'#3647c9', weight:4, opacity:.85}).addTo(lLayer);
+  route.forEach((r,i)=>{
+    const isEdge = (i===0 || i===route.length-1);
+    L.circleMarker([r.latitude, r.longitude], {
+      radius: isEdge?8:6, color:'#fff', weight:2,
+      fillColor: isEdge?'#e0405a':'#3647c9', fillOpacity:1
+    }).bindPopup((i===route.length-1?'Return to Depot':(i+1)+'. '+r.customer_name)).addTo(lLayer);
+  });
+  if(latlngs.length) lmap.fitBounds(latlngs, {padding:[30,30]});
+}
+
+document.getElementById('go').onclick = async () => {
+  const boxes=[...document.querySelectorAll('.delivery-check:checked')];
+  const ids=boxes.map(x=>x.value);
+  const err=document.getElementById('err');
+  err.style.display='none';
+  try{
+    const r = await fetch('{{url_for("api_optimize")}}', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({delivery_ids:ids, algorithm:document.getElementById('algorithm').value})
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error);
+
+    document.getElementById('results').style.display='block';
+    const m = [
+      ['Algorithm', d.algorithm], ['Before', d.before_distance+' km'],
+      ['Optimized', d.total_distance+' km'], ['Saved', d.distance_saved+' km'],
+      ['Improvement', d.improvement+'%'], ['Execution', d.execution_ms+' ms']
+    ];
+    document.getElementById('metrics').innerHTML = m.map(x=>
+      `<div class="metric-box"><small>${x[0]}</small><strong>${x[1]}</strong></div>`
+    ).join('');
+    document.getElementById('route-list').innerHTML = d.route.map((x,i)=>
+      `<li><span class="n">${i+1}</span>${(i===d.route.length-1)?'Return to Depot':x.customer_name+' — '+x.address}</li>`
+    ).join('');
+
+    if(HAS_GOOGLE) drawGoogleRoute(d.route); else drawLeafletRoute(d.route);
+  }catch(x){
+    err.textContent = x.message; err.style.display='block';
+  }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% import '_icons.html' as ic %}
+{% block content %}
+
+<div class="grid grid-4" style="margin-bottom:20px">
+  <div class="stat-card">
+    <div class="icon icon-indigo">{{ic.icon('riders-stat')}}</div>
+    <div class="label">Total Riders</div><div class="value">{{stats.riders}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="icon icon-blue">{{ic.icon('box-stat')}}</div>
+    <div class="label">Total Deliveries</div><div class="value">{{stats.deliveries}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="icon icon-green">{{ic.icon('route-stat')}}</div>
+    <div class="label">Routes Computed</div><div class="value">{{stats.routes}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="icon icon-amber">{{ic.icon('distance-stat')}}</div>
+    <div class="label">Total Distance</div><div class="value">{{stats.total_distance}} km</div>
+  </div>
+</div>
+
+<div class="grid grid-split">
+  <div class="card card-pad">
+    <div class="section-title">
+      <div><h2>Deliveries — last 7 days</h2><p>New deliveries logged per day</p></div>
+    </div>
+    <div class="bars">
+      {% for d in days %}
+      <div class="bar-col">
+        <div class="bar" style="height:{{d.pct}}%" title="{{d.count}} deliveries"></div>
+        <div class="bar-label">{{d.label}}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card card-pad">
+    <div class="section-title">
+      <div><h2>Top Riders</h2><p>By deliveries assigned</p></div>
+    </div>
+    {% if top_riders and top_riders|selectattr('c','gt',0)|list %}
+    <ul class="rank-list">
+      {% for r in top_riders %}
+      <li><div class="rank-num">{{loop.index}}</div><div class="rank-name">{{r.name}}</div><div class="rank-count">{{r.c}}</div></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:13.5px">No deliveries assigned to riders yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card card-pad" style="margin-top:16px">
+  <div class="section-title"><div><h2>System Workflow</h2><p>How a route gets optimized end to end</p></div></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-muted);font-weight:600">
+    <span class="badge badge-blue">Deliveries</span>→
+    <span class="badge badge-blue">Coordinates</span>→
+    <span class="badge badge-blue">Distance Matrix</span>→
+    <span class="badge badge-green">TSP Optimization</span>→
+    <span class="badge badge-green">Optimized Route</span>→
+    <span class="badge badge-amber">Live Map</span>
+  </div>
+</div>
+
+{% endblock %}

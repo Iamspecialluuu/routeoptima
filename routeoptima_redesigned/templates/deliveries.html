@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% import '_icons.html' as ic %}
+{% block content %}
+
+<div class="card card-pad" style="margin-bottom:18px">
+  <div class="section-title"><div><h2>Add a delivery</h2><p>Register a new customer drop-off point</p></div></div>
+  <form method="post">
+    <div class="form-row">
+      <div><label class="f-label">Customer</label><input class="f-input" name="customer_name" placeholder="Customer name" required></div>
+      <div><label class="f-label">Address / area</label><input class="f-input" name="address" placeholder="e.g. GRA Phase 2" required></div>
+      <div><label class="f-label">Latitude</label><input class="f-input" name="latitude" placeholder="4.8156" required></div>
+      <div><label class="f-label">Longitude</label><input class="f-input" name="longitude" placeholder="7.0498" required></div>
+      <div><label class="f-label">Assign rider</label>
+        <select class="f-input" name="rider_id">
+          <option value="">Unassigned</option>
+          {% for r in riders %}<option value="{{r.id}}">{{r.name}}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <input type="hidden" name="status" value="Pending">
+    <button class="btn btn-primary">{{ic.icon('plus')}}Add Delivery</button>
+  </form>
+</div>
+
+<div class="table-card">
+  <div class="table-toolbar">
+    <div class="search-box">{{ic.icon('search')}}<input id="delSearch" placeholder="Search deliveries..." oninput="filterDel()"></div>
+    <span class="badge badge-blue">{{deliveries|length}} total</span>
+  </div>
+  <table class="data" id="delTable">
+    <tr><th>Customer</th><th>Address</th><th>Coordinates</th><th>Rider</th><th>Status</th></tr>
+    {% for d in deliveries %}
+    <tr>
+      <td style="font-weight:700">{{d.customer_name}}</td>
+      <td>{{d.address}}</td>
+      <td class="mono" style="color:var(--text-muted)">{{d.latitude}}, {{d.longitude}}</td>
+      <td>{{d.rider_name or 'Unassigned'}}</td>
+      <td>
+        <form method="post" action="{{url_for('delivery_status',delivery_id=d.id)}}">
+          <select name="status" onchange="this.form.submit()" class="f-input" style="padding:6px 10px;font-size:12.8px;width:auto">
+            <option {{'selected' if d.status=='Pending'}}>Pending</option>
+            <option {{'selected' if d.status=='Assigned'}}>Assigned</option>
+            <option {{'selected' if d.status=='Delivered'}}>Delivered</option>
+          </select>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr class="empty-row"><td colspan="5">No deliveries yet — add your first delivery above.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterDel(){
+  const q=document.getElementById('delSearch').value.toLowerCase();
+  document.querySelectorAll('#delTable tr:not(:first-child)').forEach(row=>{
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

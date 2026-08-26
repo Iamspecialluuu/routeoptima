@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% import '_icons.html' as ic %}
+{% block content %}
+
+<div class="card card-pad" style="max-width:700px">
+  <div class="section-title">
+    <div>
+      <h2>Edit Rider</h2>
+      <p>Update rider information</p>
+    </div>
+  </div>
+
+  <form method="post">
+    <div class="form-row">
+      <div>
+        <label class="f-label">Name</label>
+        <input class="f-input" name="name" value="{{ rider.name }}" required>
+      </div>
+      <div>
+        <label class="f-label">Phone</label>
+        <input class="f-input" name="phone" value="{{ rider.phone }}" required>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label class="f-label">Status</label>
+        <select class="f-input" name="status">
+          <option value="Available" {% if rider.status == 'Available' %}selected{% endif %}>Available</option>
+          <option value="On Delivery" {% if rider.status == 'On Delivery' %}selected{% endif %}>On Delivery</option>
+          <option value="Offline" {% if rider.status == 'Offline' %}selected{% endif %}>Offline</option>
+        </select>
+      </div>
+      <div>
+        <label class="f-label">Latitude</label>
+        <input class="f-input" name="latitude" value="{{ rider.latitude }}" required>
+      </div>
+      <div>
+        <label class="f-label">Longitude</label>
+        <input class="f-input" name="longitude" value="{{ rider.longitude }}" required>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+      <a href="{{ url_for('riders') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

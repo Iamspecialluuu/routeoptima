@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
+
 {% block public %}
 
 <nav class="public-nav">
   <div class="brand">
     <span class="dot"></span> TSP Delivery Optimizer
   </div>
-  <div class="nav-links">
-    <a href="{{ url_for('index') }}">Home</a>
+  <div>
+    <a href="{{ url_for('login') }}">Home</a>
     <a href="{{ url_for('login') }}">Riders</a>
     <a href="{{ url_for('login') }}">Track Delivery</a>
     <a href="{{ url_for('login') }}">About</a>
@@ -14,77 +15,72 @@
   </div>
 </nav>
 
-<!-- ========== HERO ========== -->
-<section class="hero">
-  <div class="hero-content">
-    <h1>Smart Route Optimization<br>for Dispatch Riders</h1>
-    <p class="lead">
-      Use advanced algorithms to find the shortest routes,
-      save fuel, reduce delivery time and deliver more
-      packages every day.
-    </p>
-    <div class="hero-buttons">
-      <a href="{{ url_for('optimize') }}" class="btn btn-primary">Optimize Route</a>
-      <a href="{{ url_for('track') }}" class="btn btn-outline">Track Delivery</a>
+<!-- ==================== HERO ==================== -->
+<section class="hero-wrap">
+  <div class="hero">
+    <div class="hero-content">
+      <h1>Smart Route Optimization<br>for Dispatch Riders</h1>
+      <p class="lead">
+        Use advanced algorithms to find the shortest routes,
+        save fuel, reduce delivery time and deliver more
+        packages every day.
+      </p>
+      <div class="hero-buttons">
+        <a href="{{ url_for('login') }}" class="btn btn-primary">Optimize Route</a>
+        <a href="{{ url_for('login') }}" class="btn btn-outline">Track Delivery</a>
+      </div>
     </div>
-  </div>
 
-  <div class="hero-image">
-    <!-- Put your illustration here -->
-    <img src="{{ url_for('static', filename='images/delivery-scooter.png') }}" 
-         alt="Delivery rider on scooter with optimized route"
-         class="scooter-img">
+    <div class="hero-image">
+      <img src="{{ url_for('static', filename='images/delivery-scooter.png') }}"
+           alt="Delivery rider on scooter with optimized route"
+           class="scooter-img">
+    </div>
   </div>
 </section>
 
-<!-- ========== STATS ========== -->
-<section class="stats">
+<!-- ==================== STATS ==================== -->
+<section class="landing-stats">
   <div class="stat-card">
-    <div class="stat-icon purple">📦</div>
+    <div class="stat-icon">📦</div>
     <div class="stat-label">Total Deliveries</div>
     <div class="stat-value">1,248</div>
     <div class="stat-sub">Completed</div>
   </div>
+
   <div class="stat-card">
-    <div class="stat-icon green">👥</div>
+    <div class="stat-icon">👥</div>
     <div class="stat-label">Riders Active</div>
     <div class="stat-value">32</div>
     <div class="stat-sub">Online</div>
   </div>
+
   <div class="stat-card">
-    <div class="stat-icon teal">📍</div>
+    <div class="stat-icon">📍</div>
     <div class="stat-label">Kilometers Saved</div>
     <div class="stat-value">2,356 km</div>
     <div class="stat-sub">This Month</div>
   </div>
+
   <div class="stat-card">
-    <div class="stat-icon orange">⛽</div>
+    <div class="stat-icon">⛽</div>
     <div class="stat-label">Fuel Saved</div>
     <div class="stat-value">₦ 523,600</div>
     <div class="stat-sub">This Month</div>
   </div>
 </section>
 
-<!-- ========== HOW IT WORKS ========== -->
-<section class="how-it-works">
+<!-- ==================== HOW IT WORKS ==================== -->
+<section class="how">
   <h2>How It Works</h2>
-  <div class="steps">
-    <div class="step">
-      <div class="step-icon">📍</div>
+  <div class="how-grid">
+    <div class="how-step">
+      <div class="n">📍</div>
       <h3>Add Locations</h3>
       <p>Enter pickup and delivery locations.</p>
     </div>
-    <div class="step">
-      <div class="step-icon">🧠</div>
-      <h3>Optimize</h3>
-      <p>We compute the best route using TSP algorithm.</p>
-    </div>
-    <div class="step">
-      <div class="step-icon">✅</div>
-      <h3>Deliver</h3>
-      <p>Follow the route and deliver packages.</p>
-    </div>
-  </div>
-</section>
 
-{% endblock %}
+    <div class="how-step">
+      <div class="n">🧠</div>
+      <h3>Optimize</h3>
+     

@@ -1,61 +1,90 @@
 {% extends 'base.html' %}
 {% block public %}
+
 <nav class="public-nav">
-  <div class="brand"><span class="dot"></span>TSP Delivery Optimizer</div>
-  <div>
-    <a href="{{url_for('login')}}">Riders</a>
-    <a href="{{url_for('login')}}">Track Delivery</a>
-    <a href="{{url_for('login')}}">About</a>
-    <a class="cta" href="{{url_for('login')}}">Login</a>
+  <div class="brand">
+    <span class="dot"></span> TSP Delivery Optimizer
+  </div>
+  <div class="nav-links">
+    <a href="{{ url_for('index') }}">Home</a>
+    <a href="{{ url_for('login') }}">Riders</a>
+    <a href="{{ url_for('login') }}">Track Delivery</a>
+    <a href="{{ url_for('login') }}">About</a>
+    <a class="cta" href="{{ url_for('login') }}">Login</a>
   </div>
 </nav>
 
-<div class="hero-wrap">
-  <div class="hero">
-    <div>
-      <h1>Smart route optimization for dispatch riders</h1>
-      <p class="lead">RouteOptima uses exact TSP and nearest-neighbour algorithms to find the shortest delivery paths — saving fuel, time, and getting more packages delivered every day.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="{{url_for('login')}}">Optimize a Route</a>
-        <a class="btn btn-outline" href="{{url_for('login')}}">Track Delivery</a>
-      </div>
-    </div>
-    <div class="hero-art route-motif">
-      <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
-        <path class="dash-path" d="M30 240 C 100 180, 140 260, 210 190 S 320 90, 370 60" fill="none" stroke="#8b93ff" stroke-width="2.5"/>
-        <circle cx="30" cy="240" r="6" fill="#3647c9"/>
-        <circle cx="210" cy="190" r="6" fill="#7a52f4"/>
-        <circle cx="370" cy="60" r="6" fill="#3647c9"/>
-      </svg>
+<!-- ========== HERO ========== -->
+<section class="hero">
+  <div class="hero-content">
+    <h1>Smart Route Optimization<br>for Dispatch Riders</h1>
+    <p class="lead">
+      Use advanced algorithms to find the shortest routes,
+      save fuel, reduce delivery time and deliver more
+      packages every day.
+    </p>
+    <div class="hero-buttons">
+      <a href="{{ url_for('optimize') }}" class="btn btn-primary">Optimize Route</a>
+      <a href="{{ url_for('track') }}" class="btn btn-outline">Track Delivery</a>
     </div>
   </div>
 
-  <div class="landing-stats">
-    <div class="stat-card">
-      <div class="icon icon-indigo">{% import '_icons.html' as ic %}{{ic.icon('box-stat')}}</div>
-      <div class="label">Total Deliveries</div><div class="value">{{stats.deliveries}}</div>
-    </div>
-    <div class="stat-card">
-      <div class="icon icon-blue">{{ic.icon('riders-stat')}}</div>
-      <div class="label">Riders Active</div><div class="value">{{stats.riders}}</div>
-    </div>
-    <div class="stat-card">
-      <div class="icon icon-green">{{ic.icon('route-stat')}}</div>
-      <div class="label">Distance Optimized</div><div class="value">{{stats.total_distance}} km</div>
-    </div>
-    <div class="stat-card">
-      <div class="icon icon-amber">{{ic.icon('distance-stat')}}</div>
-      <div class="label">Algorithm</div><div class="value" style="font-size:16px">TSP + 2-Opt</div>
-    </div>
+  <div class="hero-image">
+    <!-- Put your illustration here -->
+    <img src="{{ url_for('static', filename='images/delivery-scooter.png') }}" 
+         alt="Delivery rider on scooter with optimized route"
+         class="scooter-img">
   </div>
+</section>
 
-  <div class="how">
-    <h2 style="font-size:20px">How it works</h2>
-    <div class="how-grid">
-      <div class="how-step"><div class="n">{{ic.icon('pin')}}</div><strong>Add locations</strong><p style="color:var(--text-muted);font-size:13.6px;margin:6px 0 0">Enter pickup and delivery points for the day's run.</p></div>
-      <div class="how-step"><div class="n">{{ic.icon('optimize')}}</div><strong>Optimize</strong><p style="color:var(--text-muted);font-size:13.6px;margin:6px 0 0">We compute the shortest route using the TSP algorithm.</p></div>
-      <div class="how-step"><div class="n">{{ic.icon('deliveries')}}</div><strong>Deliver</strong><p style="color:var(--text-muted);font-size:13.6px;margin:6px 0 0">Riders follow the optimized route and drop off packages.</p></div>
+<!-- ========== STATS ========== -->
+<section class="stats">
+  <div class="stat-card">
+    <div class="stat-icon purple">📦</div>
+    <div class="stat-label">Total Deliveries</div>
+    <div class="stat-value">1,248</div>
+    <div class="stat-sub">Completed</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green">👥</div>
+    <div class="stat-label">Riders Active</div>
+    <div class="stat-value">32</div>
+    <div class="stat-sub">Online</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon teal">📍</div>
+    <div class="stat-label">Kilometers Saved</div>
+    <div class="stat-value">2,356 km</div>
+    <div class="stat-sub">This Month</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange">⛽</div>
+    <div class="stat-label">Fuel Saved</div>
+    <div class="stat-value">₦ 523,600</div>
+    <div class="stat-sub">This Month</div>
+  </div>
+</section>
+
+<!-- ========== HOW IT WORKS ========== -->
+<section class="how-it-works">
+  <h2>How It Works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-icon">📍</div>
+      <h3>Add Locations</h3>
+      <p>Enter pickup and delivery locations.</p>
+    </div>
+    <div class="step">
+      <div class="step-icon">🧠</div>
+      <h3>Optimize</h3>
+      <p>We compute the best route using TSP algorithm.</p>
+    </div>
+    <div class="step">
+      <div class="step-icon">✅</div>
+      <h3>Deliver</h3>
+      <p>Follow the route and deliver packages.</p>
     </div>
   </div>
-</div>
+</section>
+
 {% endblock %}

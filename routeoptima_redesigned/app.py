@@ -9,7 +9,7 @@ DB_PATH = os.path.join(BASE_DIR, 'dispatch_tsp.db')
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret-key')
 GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', 'YOUR_GOOGLE_MAPS_API_KEY')
-DEPOT_NAME = 'Ikeja City Mall, Lagos, Nigeria'
+DEPOT_NAME = 'Choba,_Port_Harcourt Nigeria'
 DEPOT_COORDS = (4.8156, 7.0498)
 AVG_SPEED_KMH = 25
 

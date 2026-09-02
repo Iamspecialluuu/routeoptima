@@ -185,9 +185,12 @@ PAGE_META = {
     'dashboard': ('Dashboard', 'Overview of your delivery system'),
     'riders': ('Riders', 'Manage dispatch riders and their status'),
     'deliveries': ('Deliveries', 'Track and assign customer deliveries'),
+    'routes': ('Routes', 'Optimize and manage delivery routes'),
+    'reports': ('Reports', 'System reports and analytics'),
+    'users': ('Users', 'Manage admin users and permissions'),
+    'settings': ('Settings', 'System configuration and preferences'),
     'optimize': ('Optimize Route', 'Select stops and compute the shortest route'),
     'history': ('Route History', 'Past route optimizations and results'),
-  
 }
 
 @app.context_processor
@@ -247,10 +250,19 @@ def dashboard():
         day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
         cnt = c.execute("SELECT COUNT(*) FROM deliveries WHERE substr(created_at,1,10)=?", (day,)).fetchone()[0]
         days.append({'label': datetime.strptime(day, '%Y-%m-%d').strftime('%a'), 'count': cnt})
+    def fmt_num(n):
+        try:
+            return '{:,}'.format(int(n))
+        except (ValueError, TypeError):
+            return n
     max_day = max([d['count'] for d in days] + [1])
     for d in days:
         d['pct'] = max(6, round(d['count'] / max_day * 100))
-    return render_template('dashboard.html', stats=stats, top_riders=top_riders, days=days)
+    stats['riders_fmt'] = fmt_num(stats['riders'])
+    stats['deliveries_fmt'] = fmt_num(stats['deliveries'])
+    stats['routes_fmt'] = fmt_num(stats['routes'])
+    stats['total_distance_fmt'] = fmt_num(stats['total_distance'])
+    return render_template('dashboard.html', stats=stats, top_riders=top_riders, days=days, max_day=max_day, fmt_num=fmt_num)
 
 @app.route('/riders', methods=['GET', 'POST'])
 @login_required
@@ -406,6 +418,29 @@ def api_optimize():
 @login_required
 def history():
     return render_template('history.html', history=db().execute('SELECT * FROM route_history ORDER BY id DESC').fetchall())
+
+@app.route('/routes')
+@login_required
+def routes():
+    return redirect(url_for('optimize'))
+
+@app.route('/reports')
+@login_required
+def reports():
+    flash('Reports module coming soon.', 'info')
+    return redirect(url_for('dashboard'))
+
+@app.route('/users')
+@login_required
+def users():
+    flash('Users module coming soon.', 'info')
+    return redirect(url_for('dashboard'))
+
+@app.route('/settings')
+@login_required
+def settings():
+    flash('Settings module coming soon.', 'info')
+    return redirect(url_for('dashboard'))
 
 # @app.route('/backend')
 # @login_required

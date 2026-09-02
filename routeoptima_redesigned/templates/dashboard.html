@@ -2,65 +2,132 @@
 {% import '_icons.html' as ic %}
 {% block content %}
 
-<div class="grid grid-4" style="margin-bottom:20px">
-  <div class="stat-card">
-    <div class="icon icon-indigo">{{ic.icon('riders-stat')}}</div>
-    <div class="label">Total Riders</div><div class="value">{{stats.riders}}</div>
+<div class="welcome-header" style="margin-bottom:24px">
+  <h1 class="welcome-title">Welcome, Admin 👋</h1>
+  <p class="welcome-sub">Overview of your delivery system</p>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:24px">
+  <div class="stat-card-v2">
+    <div class="stat-row">
+      <div class="stat-icon stat-icon-purple">{{ic.icon('riders-stat')}}</div>
+      <div class="stat-text">
+        <div class="stat-label">Total Riders</div>
+        <div class="stat-value">{{stats.riders_fmt}}</div>
+      </div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="icon icon-blue">{{ic.icon('box-stat')}}</div>
-    <div class="label">Total Deliveries</div><div class="value">{{stats.deliveries}}</div>
+  <div class="stat-card-v2">
+    <div class="stat-row">
+      <div class="stat-icon stat-icon-green">{{ic.icon('box-stat')}}</div>
+      <div class="stat-text">
+        <div class="stat-label">Total Deliveries</div>
+        <div class="stat-value">{{stats.deliveries_fmt}}</div>
+      </div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="icon icon-green">{{ic.icon('route-stat')}}</div>
-    <div class="label">Routes Computed</div><div class="value">{{stats.routes}}</div>
+  <div class="stat-card-v2">
+    <div class="stat-row">
+      <div class="stat-icon stat-icon-blue">{{ic.icon('route-stat')}}</div>
+      <div class="stat-text">
+        <div class="stat-label">Total Routes</div>
+        <div class="stat-value">{{stats.routes_fmt}}</div>
+      </div>
+    </div>
   </div>
-  <div class="stat-card">
-    <div class="icon icon-amber">{{ic.icon('distance-stat')}}</div>
-    <div class="label">Total Distance</div><div class="value">{{stats.total_distance}} km</div>
+  <div class="stat-card-v2">
+    <div class="stat-row">
+      <div class="stat-icon stat-icon-cyan">{{ic.icon('distance-stat')}}</div>
+      <div class="stat-text">
+        <div class="stat-label">Total Distance</div>
+        <div class="stat-value">{{stats.total_distance_fmt}} km</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="grid grid-split">
   <div class="card card-pad">
     <div class="section-title">
-      <div><h2>Deliveries — last 7 days</h2><p>New deliveries logged per day</p></div>
+      <div><h2>Deliveries (Last 7 Days)</h2></div>
     </div>
-    <div class="bars">
-      {% for d in days %}
-      <div class="bar-col">
-        <div class="bar" style="height:{{d.pct}}%" title="{{d.count}} deliveries"></div>
-        <div class="bar-label">{{d.label}}</div>
-      </div>
-      {% endfor %}
+    <div class="line-chart-wrap">
+      <svg class="line-chart" viewBox="0 0 600 260" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3647c9" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#3647c9" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        {% set n = days|length %}
+        {% set pad_left = 40 %}
+        {% set pad_right = 20 %}
+        {% set pad_top = 20 %}
+        {% set pad_bot = 40 %}
+        {% set chart_w = 600 - pad_left - pad_right %}
+        {% set chart_h = 260 - pad_top - pad_bot %}
+        {% set step_x = chart_w / (n - 1) if n > 1 else chart_w %}
+
+        {% for g in [0,1,2,3,4] %}
+          {% set gy = pad_top + (chart_h / 4) * g %}
+          {% set gval = (max_day / 4) * (4 - g) %}
+          <line x1="{{pad_left}}" y1="{{gy}}" x2="{{600 - pad_right}}" y2="{{gy}}" stroke="#e6e9f5" stroke-width="1" stroke-dasharray="3 4"/>
+          <text x="{{pad_left - 8}}" y="{{gy + 4}}" text-anchor="end" fill="#9498b8" font-size="11" font-family="'Plus Jakarta Sans',sans-serif" font-weight="600">{{gval|round(0, 'floor')|int}}</text>
+        {% endfor %}
+
+        {% set pts = [] %}
+        {% for i in range(n) %}
+          {% set x = pad_left + step_x * i %}
+          {% set y = pad_top + chart_h - (days[i].count / max_day * chart_h) if max_day > 0 else pad_top + chart_h %}
+          {% if pts.append({'x': x, 'y': y}) %}{% endif %}
+        {% endfor %}
+
+        <polygon points="
+          {%- for p in pts -%}{{p.x}},{{pad_top + chart_h}} {% endfor %}
+          {%- for p in pts|reverse -%}{{p.x}},{{p.y}} {% endfor %}
+        " fill="url(#lineGrad)"/>
+
+        <polyline
+          fill="none"
+          stroke="#3647c9"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          points="{% for p in pts %}{{p.x}},{{p.y}}{% if not loop.last %} {% endif %}{% endfor %}"
+        />
+
+        {% for i in range(n) %}
+          {% set p = pts[i] %}
+          <circle cx="{{p.x}}" cy="{{p.y}}" r="5" fill="#ffffff" stroke="#3647c9" stroke-width="2.5"/>
+          <circle cx="{{p.x}}" cy="{{p.y}}" r="2" fill="#3647c9"/>
+        {% endfor %}
+
+        {% for i in range(n) %}
+          {% set x = pad_left + step_x * i %}
+          <text x="{{x}}" y="{{260 - pad_bot + 22}}" text-anchor="middle" fill="#9498b8" font-size="11.5" font-family="'Plus Jakarta Sans',sans-serif" font-weight="600">{{days[i].label}}</text>
+        {% endfor %}
+      </svg>
     </div>
   </div>
 
   <div class="card card-pad">
     <div class="section-title">
-      <div><h2>Top Riders</h2><p>By deliveries assigned</p></div>
+      <div><h2>Top Riders</h2></div>
     </div>
     {% if top_riders and top_riders|selectattr('c','gt',0)|list %}
-    <ul class="rank-list">
+    <ul class="rank-list-v2">
       {% for r in top_riders %}
-      <li><div class="rank-num">{{loop.index}}</div><div class="rank-name">{{r.name}}</div><div class="rank-count">{{r.c}}</div></li>
+      <li>
+        <div class="rank-num-v2 rank-{{loop.index}}">{{loop.index}}</div>
+        <div class="rank-name-v2">{{r.name}}</div>
+        <div class="rank-count-v2">{{r.c}}</div>
+      </li>
       {% endfor %}
     </ul>
     {% else %}
     <p style="color:var(--text-muted);font-size:13.5px">No deliveries assigned to riders yet.</p>
     {% endif %}
-  </div>
-</div>
-
-<div class="card card-pad" style="margin-top:16px">
-  <div class="section-title"><div><h2>System Workflow</h2><p>How a route gets optimized end to end</p></div></div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-muted);font-weight:600">
-    <span class="badge badge-blue">Deliveries</span>→
-    <span class="badge badge-blue">Coordinates</span>→
-    <span class="badge badge-blue">Distance Matrix</span>→
-    <span class="badge badge-green">TSP Optimization</span>→
-    <span class="badge badge-green">Optimized Route</span>→
-    <span class="badge badge-amber">Live Map</span>
   </div>
 </div>
 

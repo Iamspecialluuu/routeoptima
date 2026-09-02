@@ -13,14 +13,15 @@
 {% if session.get('admin_id') %}
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="brand"><div class="mark">R</div><span>RouteOptima</span></div>
+    <div class="brand"><div class="mark">T</div><span>TSP Admin Panel</span></div>
     <nav>
-      <a href="{{url_for('dashboard')}}" class="{{'active' if request.endpoint=='dashboard'}}">{{ic.icon('dashboard')}}Dashboard</a>
-      <a href="{{url_for('riders')}}" class="{{'active' if request.endpoint=='riders'}}">{{ic.icon('riders')}}Riders</a>
+      <a href="{{url_for('dashboard')}}" class="{{'active' if request.endpoint in ['dashboard']}}">{{ic.icon('dashboard')}}Dashboard</a>
+      <a href="{{url_for('riders')}}" class="{{'active' if request.endpoint in ['riders','add_rider_page','edit_rider','view_rider']}}">{{ic.icon('riders')}}Riders</a>
       <a href="{{url_for('deliveries')}}" class="{{'active' if request.endpoint=='deliveries'}}">{{ic.icon('deliveries')}}Deliveries</a>
-      <a href="{{url_for('optimize')}}" class="{{'active' if request.endpoint=='optimize'}}">{{ic.icon('optimize')}}Optimize Route</a>
-      <a href="{{url_for('history')}}" class="{{'active' if request.endpoint=='history'}}">{{ic.icon('history')}}History</a>
-
+      <a href="{{url_for('routes')}}" class="{{'active' if request.endpoint in ['routes','optimize']}}">{{ic.icon('routes')}}Routes</a>
+      <a href="{{url_for('reports')}}" class="{{'active' if request.endpoint in ['reports','history']}}">{{ic.icon('reports')}}Reports</a>
+      <a href="{{url_for('users')}}" class="{{'active' if request.endpoint=='users'}}">{{ic.icon('users')}}Users</a>
+      <a href="{{url_for('settings')}}" class="{{'active' if request.endpoint=='settings'}}">{{ic.icon('settings')}}Settings</a>
     </nav>
     <div class="foot">
       <a href="{{url_for('logout')}}">{{ic.icon('logout')}}Logout</a>
@@ -28,6 +29,7 @@
   </aside>
 
   <div class="main">
+    {% if request.endpoint != 'dashboard' %}
     <div class="topbar">
       <div class="title">
         <h1>{{page_title or 'Dashboard'}}</h1>
@@ -37,6 +39,13 @@
         <div class="avatar">{{(session.get('username') or 'A')[0]|upper}}</div>
       </div>
     </div>
+    {% else %}
+    <div class="dash-user-row">
+      <div class="user">
+        <div class="avatar">{{(session.get('username') or 'A')[0]|upper}}</div>
+      </div>
+    </div>
+    {% endif %}
     <div class="page">
       {% with messages=get_flashed_messages(with_categories=true) %}
         {% for c,m in messages %}<div class="flash flash-{{c}}">{{m}}</div>{% endfor %}

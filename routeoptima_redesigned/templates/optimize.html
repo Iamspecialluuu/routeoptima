@@ -100,8 +100,8 @@
 const HAS_GOOGLE = {{ 'true' if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' else 'false' }};
 const DEPOT = {lat:4.8156, lng:7.0498, name:{{depot_name|tojson}}};
 let gmap, dirService, dirRenderer, gmap2;
-let lmap, lSatellite, lStreets, lMarkers;
-let lmap2, lSatellite2, lStreets2, lMarkers2;
+let lmap, lSatellite, lStreets, lMarkers, lLines;
+let lmap2, lSatellite2, lStreets2, lMarkers2, lLines2;
 let usingGoogle = false, mapReady = false, map2Ready = false;
 let selectedStops = [];
 let lastRoute = null;
@@ -182,6 +182,7 @@ function initLeafletMap(){
     lmap = L.map('map', {zoomControl:true}).setView([DEPOT.lat, DEPOT.lng], 12);
     lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap', maxZoom:19}).addTo(lmap);
     lSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'Tiles &copy; Esri', maxZoom:19});
+    lLines = L.layerGroup().addTo(lmap);
     lMarkers = L.layerGroup().addTo(lmap);
     usingGoogle = false; mapReady = true;
     setupToggle('mapToggle', lmap, lStreets, lSatellite);
@@ -196,6 +197,7 @@ function initLeafletMap2(){
     lmap2 = L.map('map2', {zoomControl:true}).setView([DEPOT.lat, DEPOT.lng], 12);
     lStreets2 = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap', maxZoom:19}).addTo(lmap2);
     lSatellite2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'Tiles &copy; Esri', maxZoom:19});
+    lLines2 = L.layerGroup().addTo(lmap2);
     lMarkers2 = L.layerGroup().addTo(lmap2);
     map2Ready = true;
     setupToggle('mapToggle2', lmap2, lStreets2, lSatellite2);
@@ -269,18 +271,19 @@ function redrawMapStops(){
   if(!mapReady) return;
   if(usingGoogle){
     if(window._gMarkers) window._gMarkers.forEach(m=>m.setMap(null));
-    if(window._gLine) window._gLine.setMap(null);
+    if(window._gLineOuter) { window._gLineOuter.setMap(null); window._gLineOuter = null; }
+    if(window._gLineInner) { window._gLineInner.setMap(null); window._gLineInner = null; }
     const markers = [];
     const path = [{lat:DEPOT.lat,lng:DEPOT.lng}];
     const depotMarker = new google.maps.Marker({
-      position:DEPOT, map:gmap,
+      position:DEPOT, map:gmap, zIndex:9999,
       icon: pinIconGoogle(1, true),
       title: DEPOT.name
     });
     markers.push(depotMarker);
     selectedStops.forEach((s,i)=>{
       const m = new google.maps.Marker({
-        position:{lat:s.lat,lng:s.lng}, map:gmap,
+        position:{lat:s.lat,lng:s.lng}, map:gmap, zIndex:1000+i,
         icon: pinIconGoogle(i+2, false),
         title: `${i+1}. ${s.name}`
       });
@@ -288,29 +291,37 @@ function redrawMapStops(){
       path.push({lat:s.lat,lng:s.lng});
     });
     path.push({lat:DEPOT.lat,lng:DEPOT.lng});
-    window._gLine = new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:5, strokeOpacity:0.95, map:gmap});
+    window._gLineOuter = new google.maps.Polyline({
+      path, strokeColor:'#ffffff', strokeWeight:15, strokeOpacity:1.0, clickable:false, zIndex:1, map:gmap
+    });
+    window._gLineInner = new google.maps.Polyline({
+      path, strokeColor:'#1629ff', strokeWeight:9, strokeOpacity:1.0, clickable:false, zIndex:2, map:gmap
+    });
     window._gMarkers = markers;
     if(path.length > 3){
       try{
         const b = new google.maps.LatLngBounds();
         path.forEach(p=>b.extend(p));
-        gmap.fitBounds(b, 50);
+        setTimeout(()=>{ try{ gmap.fitBounds(b, 70); }catch(_){} }, 40);
       }catch(_){}
     }
   } else if(lmap){
     lMarkers.clearLayers();
+    if(lLines) lLines.clearLayers();
     const latlngs = [[DEPOT.lat, DEPOT.lng]];
-    L.marker([DEPOT.lat, DEPOT.lng], {icon:pinIconLeaflet(1, true)}).bindPopup('<b>Start</b><br>'+DEPOT.name).addTo(lMarkers);
+    L.marker([DEPOT.lat, DEPOT.lng], {icon:pinIconLeaflet(1, true), zIndexOffset:9999}).bindPopup('<b>Start</b><br>'+DEPOT.name).addTo(lMarkers);
     selectedStops.forEach((s,i)=>{
-      L.marker([s.lat, s.lng], {icon:pinIconLeaflet(i+2, false)}).bindPopup(`<b>${i+1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
+      L.marker([s.lat, s.lng], {icon:pinIconLeaflet(i+2, false), zIndexOffset:9000+i})
+        .bindPopup(`<b>${i+1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
       latlngs.push([s.lat, s.lng]);
     });
     if(selectedStops.length > 0){
       latlngs.push([DEPOT.lat, DEPOT.lng]);
-      L.polyline(latlngs, {color:'#2130b8', weight:5, opacity:0.95}).addTo(lMarkers);
+      L.polyline(latlngs, {color:'#ffffff', weight:15, opacity:1, interactive:false, lineJoin:'round'}).addTo(lLines);
+      L.polyline(latlngs, {color:'#1629ff', weight:9, opacity:1, interactive:false, lineJoin:'round'}).addTo(lLines);
     }
     if(latlngs.length > 3){
-      try{ lmap.fitBounds(L.latLngBounds(latlngs).pad(0.28)); }catch(_){}
+      try{ lmap.fitBounds(L.latLngBounds(latlngs).pad(0.35)); }catch(_){}
     }
   }
 }
@@ -373,9 +384,12 @@ async function computeRoute(){
         drawGoogleRouteResult(d.route, gmap2);
       } else {
         initLeafletMap2();
-        drawLeafletRouteResult(d.route);
+        setTimeout(()=>{
+          try{ lmap2.invalidateSize(true); }catch(_){}
+          drawLeafletRouteResult(d.route);
+        }, 80);
       }
-    }, 50);
+    }, 80);
   }catch(x){
     err.textContent = x.message; err.style.display='block';
   }
@@ -388,70 +402,80 @@ function drawGoogleRouteResult(route, map){
   route.forEach((x,i)=>{
     if(x.is_depot_start){
       new google.maps.Marker({
-        position:{lat:x.latitude,lng:x.longitude}, map,
+        position:{lat:x.latitude,lng:x.longitude}, map, zIndex:9999,
         icon: pinIconGoogle(1, true), title: '1. Start'
       });
     } else if(x.is_depot_end){
       // skip duplicate depot pin (start pin 1 already there)
     } else {
       new google.maps.Marker({
-        position:{lat:x.latitude,lng:x.longitude}, map,
+        position:{lat:x.latitude,lng:x.longitude}, map, zIndex:9000+i,
         icon: pinIconGoogle(i+1, false),
         title: `${i+1}. ${x.customer_name}`
       });
     }
   });
+  const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
+
+  const drawExplicitLines = () => {
+    new google.maps.Polyline({
+      path, strokeColor:'#ffffff', strokeWeight:17, strokeOpacity:1.0, clickable:false, zIndex:1, map
+    });
+    new google.maps.Polyline({
+      path, strokeColor:'#1629ff', strokeWeight:10, strokeOpacity:1.0, clickable:false, zIndex:2, map
+    });
+  };
+  drawExplicitLines();
+
   if(dirService){
-    const origin = {lat:route[0].latitude, lng:route[0].longitude};
-    const destination = {lat:route[route.length-1].latitude, lng:route[route.length-1].longitude};
+    const origin = path[0];
+    const destination = path[path.length-1];
     const wp = route.slice(1,-1).map(x=>({location:{lat:x.latitude,lng:x.longitude}, stopover:true}));
     try{
       dirService.route({origin, destination, waypoints:wp, travelMode:google.maps.TravelMode.DRIVING},
         (res,status)=>{
           if(status==='OK'){
-            new google.maps.DirectionsRenderer({map, directions:res, suppressMarkers:true,
-              polylineOptions:{strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95}});
-          } else {
-            const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
-            new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95, map});
+            try{
+              new google.maps.DirectionsRenderer({map, directions:res, suppressMarkers:true, preserveViewport:true,
+                polylineOptions:{strokeColor:'#1629ff', strokeWeight:10, strokeOpacity:1.0, zIndex:2}});
+            }catch(_){}
           }
         });
-    }catch(_){
-      const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
-      new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95, map});
-    }
-  } else {
-    const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
-    new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95, map});
+    }catch(_){}
   }
-  // Fit bounds
   try{
     const b = new google.maps.LatLngBounds();
-    route.forEach(x=>b.extend({lat:x.latitude,lng:x.longitude}));
-    map.fitBounds(b, 60);
+    path.forEach(p=>b.extend(p));
+    setTimeout(()=>{ try{ map.fitBounds(b, 80); }catch(_){} }, 60);
   }catch(_){}
 }
 function drawLeafletRouteResult(route){
   if(!lmap2 || !lMarkers2) return;
-  setTimeout(()=>lmap2.invalidateSize(), 150);
+  try{ lmap2.invalidateSize(true); }catch(_){}
+  if(lLines2) lLines2.clearLayers();
   lMarkers2.clearLayers();
   const latlngs = [];
   route.forEach((x,i)=>{
     latlngs.push([x.latitude, x.longitude]);
     if(x.is_depot_start){
-      L.marker([x.latitude, x.longitude], {icon:pinIconLeaflet(1, true)})
+      L.marker([x.latitude, x.longitude], {icon:pinIconLeaflet(1, true), zIndexOffset:9999})
         .bindPopup('<b>1. Start</b><br>'+x.customer_name).addTo(lMarkers2);
     } else if(x.is_depot_end){
       // skip
     } else {
-      L.marker([x.latitude, x.longitude], {icon:pinIconLeaflet(i+1, false)})
+      L.marker([x.latitude, x.longitude], {icon:pinIconLeaflet(i+1, false), zIndexOffset:9000+i})
         .bindPopup(`<b>${i+1}. ${x.customer_name}</b><br>${x.address||''}`).addTo(lMarkers2);
     }
   });
-  L.polyline(latlngs, {color:'#2130b8', weight:6, opacity:0.95}).addTo(lMarkers2);
+  L.polyline(latlngs, {color:'#ffffff', weight:17, opacity:1, interactive:false, lineJoin:'round'}).addTo(lLines2);
+  L.polyline(latlngs, {color:'#1629ff', weight:10, opacity:1, interactive:false, lineJoin:'round'}).addTo(lLines2);
   if(latlngs.length){
-    try{ lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.3)); }catch(_){}
+    try{ lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.4)); }catch(_){}
   }
+  setTimeout(()=>{
+    try{ lmap2.invalidateSize(true); }catch(_){}
+    if(latlngs.length){ try{ lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.4)); }catch(_){} }
+  }, 250);
 }
 
 /* ---------------- Print / Download ---------------- */

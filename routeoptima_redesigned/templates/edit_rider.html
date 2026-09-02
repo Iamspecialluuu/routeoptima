@@ -20,6 +20,10 @@
         <label class="f-label">Phone</label>
         <input class="f-input" name="phone" value="{{ rider.phone }}" required>
       </div>
+      <div>
+        <label class="f-label">Vehicle</label>
+        <input class="f-input" name="vehicle" value="{{ rider.vehicle or '' }}" placeholder="e.g. Honda CB125">
+      </div>
     </div>
 
     <div class="form-row">

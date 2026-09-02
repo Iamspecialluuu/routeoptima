@@ -2,51 +2,13 @@
 {% import '_icons.html' as ic %}
 {% block content %}
 
-<div class="card card-pad" style="margin-bottom:18px">
-  <div class="section-title">
-    <div>
-      <h2>Add a rider</h2>
-      <p>Register a new dispatch rider and their starting location</p>
-    </div>
-  </div>
-  <form method="post">
-    <div class="form-row">
-      <div>
-        <label class="f-label">Name</label>
-        <input class="f-input" name="name" placeholder="e.g. Chinedu Okafor" required>
-      </div>
-      <div>
-        <label class="f-label">Phone</label>
-        <input class="f-input" name="phone" placeholder="0803 000 0001" required>
-      </div>
-      <div>
-        <label class="f-label">Status</label>
-        <select class="f-input" name="status">
-          <option>Available</option>
-          <option>On Delivery</option>
-          <option>Offline</option>
-        </select>
-      </div>
-      <div>
-        <label class="f-label">Latitude</label>
-        <input class="f-input" name="latitude" placeholder="4.8156" required>
-      </div>
-      <div>
-        <label class="f-label">Longitude</label>
-        <input class="f-input" name="longitude" placeholder="7.0498" required>
-      </div>
-    </div>
-    <button class="btn btn-primary">{{ ic.icon('plus') }} Add Rider</button>
-  </form>
-</div>
-
 <div class="table-card">
   <div class="table-toolbar">
     <div class="search-box">
       {{ ic.icon('search') }}
       <input id="riderSearch" placeholder="Search rider..." oninput="filterRiders()">
     </div>
-    <span class="badge badge-blue">{{ riders|length }} total</span>
+    <a href="{{ url_for('add_rider_page') }}" class="btn btn-primary btn-sm">{{ ic.icon('plus') }} Add Rider</a>
   </div>
 
   <table class="data" id="riderTable">
@@ -55,8 +17,9 @@
         <th>#</th>
         <th>Rider</th>
         <th>Phone</th>
+        <th>Vehicle</th>
         <th>Status</th>
-        <th>Coordinates</th>
+        <th>Deliveries</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -66,6 +29,7 @@
         <td>{{ loop.index }}</td>
         <td style="font-weight:700">{{ r.name }}</td>
         <td class="mono">{{ r.phone }}</td>
+        <td>{{ r.vehicle or '—' }}</td>
         <td>
           {% if r.status == 'Available' %}
             <span class="badge badge-green">Online</span>
@@ -75,23 +39,17 @@
             <span class="badge badge-grey">Offline</span>
           {% endif %}
         </td>
-        <td class="mono" style="color:var(--text-muted)">
-          {{ r.latitude }}, {{ r.longitude }}
-        </td>
+        <td>{{ r.deliveries_count }}</td>
         <td>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a href="{{ url_for('edit_rider', rider_id=r.id) }}" class="btn btn-sm btn-outline">
-              Edit
-            </a>
-            <a href="{{ url_for('view_rider', rider_id=r.id) }}" class="btn btn-sm btn-outline">
-              View
-            </a>
+          <div style="display:flex; gap:14px;">
+            <a href="{{ url_for('edit_rider', rider_id=r.id) }}" class="action-link">Edit</a>
+            <a href="{{ url_for('view_rider', rider_id=r.id) }}" class="action-link">View</a>
           </div>
         </td>
       </tr>
       {% else %}
       <tr class="empty-row">
-        <td colspan="6">No riders yet — add your first rider above.</td>
+        <td colspan="7">No riders yet — add your first rider.</td>
       </tr>
       {% endfor %}
     </tbody>

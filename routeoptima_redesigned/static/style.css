@@ -69,6 +69,12 @@ h1,h2,h3,h4,h5{
 a{color:var(--primary);text-decoration:none}
 .mono{font-family:'JetBrains Mono',monospace}
 
+/* Prevent unsized inline SVG icons from rendering at the browser's
+   default intrinsic size (which caused oversized buttons/icons).
+   Specific rules below (sidebar, stat-card, search-box) still win
+   via higher specificity. */
+svg{width:1em;height:1em;display:inline-block;vertical-align:-0.15em}
+
 /* ---------- Focus visibility ---------- */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.btn:focus-visible{
   outline:2px solid var(--primary);outline-offset:2px;
@@ -334,6 +340,13 @@ table.data tr:hover td{background:#fbfbfe}
 
 .empty-row td{text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13.5px}
 
+.action-link{
+  color:var(--primary);font-weight:700;font-size:12.8px;
+  background:none;border:0;padding:0;cursor:pointer;font-family:inherit;
+}
+.action-link:hover{text-decoration:underline}
+.action-link.danger{color:var(--danger)}
+
 /* ============================================================
    Optimize page
    ============================================================ */
@@ -364,6 +377,36 @@ table.data tr:hover td{background:#fbfbfe}
   width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;font-weight:800;
   display:flex;align-items:center;justify-content:center;flex:none;
 }
+#route-list li .x-remove,.stop-row .x-remove{
+  margin-left:auto;background:none;border:0;color:var(--text-faint);cursor:pointer;
+  font-size:15px;line-height:1;padding:2px 4px;border-radius:5px;
+}
+#route-list li .x-remove:hover,.stop-row .x-remove:hover{background:var(--danger-bg);color:var(--danger)}
+
+.stop-row{
+  display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);
+  border-radius:9px;padding:9px 12px;margin-bottom:8px;font-size:13.4px;
+}
+.stop-row .n{
+  width:20px;height:20px;border-radius:50%;background:var(--primary-50);color:var(--primary-700);
+  font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;
+}
+.stop-row .txt{flex:1;min-width:0}
+.stop-row .txt b{display:block;font-size:13.4px}
+.stop-row .txt span{display:block;font-size:11.6px;color:var(--text-muted)}
+.add-location-row{display:flex;gap:8px;margin-top:4px}
+.add-location-row select{flex:1}
+
+.map-toggle{
+  position:absolute;top:12px;left:12px;z-index:400;background:var(--surface);
+  border-radius:9px;padding:3px;display:flex;gap:2px;box-shadow:var(--shadow);border:1px solid var(--border);
+}
+.map-toggle button{
+  border:0;background:transparent;padding:6px 12px;font-size:12px;font-weight:700;border-radius:7px;
+  color:var(--text-muted);cursor:pointer;font-family:inherit;
+}
+.map-toggle button.active{background:var(--primary);color:#fff}
+.map-col{position:relative}
 
 /* ============================================================
    Backend / architecture page

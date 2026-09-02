@@ -13,51 +13,76 @@
 {% block content %}
 <div class="grid grid-split">
   <div class="card card-pad">
-    <label class="f-label">Algorithm</label>
-    <select id="algorithm" class="f-input" style="margin-bottom:18px">
-      <option value="auto">Automatic</option>
-      <option value="exact">Exact TSP</option>
-      <option value="nearest">Nearest Neighbour</option>
-    </select>
 
-    <label class="f-label">Delivery stops</label>
-    <div style="max-height:340px;overflow:auto;margin-top:8px">
-      {% for d in deliveries %}
-      <label class="stop-check">
-        <input class="delivery-check" type="checkbox" value="{{d.id}}" data-lat="{{d.latitude}}" data-lng="{{d.longitude}}" data-name="{{d.customer_name}}">
-        <span><span class="t">{{d.customer_name}}</span><br><span class="s">{{d.address}}</span></span>
-      </label>
-      {% else %}
-      <p style="color:var(--text-muted);font-size:13.5px">No pending deliveries to optimize.</p>
-      {% endfor %}
+    <label class="f-label">Pickup Location</label>
+    <input class="f-input" value="{{ depot_name }}" readonly style="margin-bottom:16px;background:var(--bg)">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <label class="f-label" style="margin:0">Delivery Locations</label>
+      <select id="algorithm" class="f-input" style="width:auto;padding:5px 8px;font-size:12px">
+        <option value="auto">Automatic</option>
+        <option value="exact">Exact TSP</option>
+        <option value="nearest">Nearest Neighbour</option>
+      </select>
     </div>
 
-    <button id="go" class="btn btn-primary btn-block" style="margin-top:16px">{{ic.icon('optimize')}}Calculate Optimized Route</button>
+    <div id="stopList" style="margin-top:4px"></div>
+
+    <div class="add-location-row">
+      <select id="addSelect" class="f-input">
+        <option value="">Select a delivery to add…</option>
+        {% for d in deliveries %}
+        <option value="{{d.id}}" data-lat="{{d.latitude}}" data-lng="{{d.longitude}}" data-name="{{d.customer_name|e}}" data-addr="{{d.address|e}}">{{d.customer_name}} — {{d.address}}</option>
+        {% endfor %}
+      </select>
+      <button type="button" id="addStopBtn" class="btn btn-outline btn-sm">{{ic.icon('plus')}} Add Location</button>
+    </div>
+
+    <button id="go" class="btn btn-primary btn-block" style="margin-top:18px">Optimize Route</button>
     <div id="err" class="flash flash-danger" style="display:none;margin-top:12px"></div>
   </div>
 
   <div class="map-col">
     <div id="map"></div>
+    <div class="map-toggle" id="mapToggle" style="display:none">
+      <button type="button" data-mode="map" class="active">Map</button>
+      <button type="button" data-mode="satellite">Satellite</button>
+    </div>
   </div>
 </div>
 
 <div id="results" class="card card-pad" style="margin-top:16px;display:none">
-  <div class="section-title"><div><h2>Optimization Result</h2><p>Shortest visiting order for the selected stops</p></div></div>
+  <div class="section-title"><div><h2>Optimization Result</h2></div></div>
   <div id="metrics" class="grid grid-4"></div>
-  <ol id="route-list"></ol>
+
+  <div style="margin-top:18px">
+    <label class="f-label">Optimized Visit Order</label>
+    <div id="route-list" style="margin-top:8px"></div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button type="button" id="printBtn" class="btn btn-outline">Print</button>
+    <button type="button" id="downloadBtn" class="btn btn-success">Download Route</button>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 const HAS_GOOGLE = {{ 'true' if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' else 'false' }};
-const DEPOT = {lat:4.8156, lng:7.0498};
-let gmap, dirService, dirRenderer, lmap, lLayer;
+const DEPOT = {lat:4.8156, lng:7.0498, name:{{depot_name|tojson}}};
+let gmap, dirService, dirRenderer, lmap, lLayer, lSatellite, lStreets;
 let usingGoogle = false, mapReady = false;
+let selectedStops = [];      // {id,name,addr,lat,lng}
+let lastRoute = null;        // last computed route response
 
+/* ---------------- Map init ---------------- */
 function initGoogleMap(){
   try{
-    gmap = new google.maps.Map(document.getElementById('map'), {center:DEPOT, zoom:12, disableDefaultUI:false});
+    gmap = new google.maps.Map(document.getElementById('map'), {
+      center:DEPOT, zoom:12, mapTypeControl:true,
+      mapTypeControlOptions:{position: google.maps.ControlPosition.TOP_LEFT}
+    });
     dirService = new google.maps.DirectionsService();
     dirRenderer = new google.maps.DirectionsRenderer({map:gmap, suppressMarkers:false});
     usingGoogle = true; mapReady = true;
@@ -66,18 +91,24 @@ function initGoogleMap(){
 function initLeafletMap(){
   if(typeof L === 'undefined'){ mapFailed(); return; }
   try{
-    lmap = L.map('map').setView([DEPOT.lat, DEPOT.lng], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:'&copy; OpenStreetMap contributors', maxZoom:19
-    }).addTo(lmap);
+    lmap = L.map('map', {zoomControl:true}).setView([DEPOT.lat, DEPOT.lng], 12);
+    lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors', maxZoom:19}).addTo(lmap);
+    lSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'Tiles &copy; Esri', maxZoom:19});
     lLayer = L.layerGroup().addTo(lmap);
     usingGoogle = false; mapReady = true;
+    document.getElementById('mapToggle').style.display = 'flex';
     setTimeout(()=>lmap.invalidateSize(), 200);
     window.addEventListener('resize', ()=>lmap && lmap.invalidateSize());
   }catch(e){ console.warn('Leaflet failed to init:', e); mapFailed(); }
 }
+document.getElementById('mapToggle').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button'); if(!btn || !lmap) return;
+  document.querySelectorAll('.map-toggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(btn.dataset.mode === 'satellite'){ lmap.removeLayer(lStreets); lSatellite.addTo(lmap); }
+  else { lmap.removeLayer(lSatellite); lStreets.addTo(lmap); }
+});
 function fallbackToLeaflet(){
-  // load Leaflet dynamically if it wasn't already loaded (Google path)
   if(typeof L !== 'undefined'){ initLeafletMap(); return; }
   const css = document.createElement('link'); css.rel='stylesheet'; css.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
   document.head.appendChild(css);
@@ -87,18 +118,44 @@ function fallbackToLeaflet(){
 }
 function mapFailed(){
   const el = document.getElementById('map');
-  if(el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:13.5px;text-align:center;padding:20px">Map preview is unavailable right now — the route results below are still accurate.</div>';
+  if(el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:13.5px;text-align:center;padding:20px">Map preview is unavailable right now — the route results are still accurate.</div>';
 }
-
 window.addEventListener('DOMContentLoaded', () => {
-  if(HAS_GOOGLE){
-    // if Google's callback hasn't fired within 4s (bad key, billing, referrer block), fall back
-    setTimeout(()=>{ if(!mapReady) fallbackToLeaflet(); }, 4000);
-  } else {
-    initLeafletMap();
-  }
+  if(HAS_GOOGLE){ setTimeout(()=>{ if(!mapReady) fallbackToLeaflet(); }, 4000); }
+  else { initLeafletMap(); }
+  renderStopList();
 });
 
+/* ---------------- Stop list (add / remove) ---------------- */
+document.getElementById('addStopBtn').onclick = () => {
+  const sel = document.getElementById('addSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if(!opt || !opt.value) return;
+  const id = opt.value;
+  if(selectedStops.find(s=>s.id===id)) return;
+  selectedStops.push({id, name:opt.dataset.name, addr:opt.dataset.addr, lat:opt.dataset.lat, lng:opt.dataset.lng});
+  sel.value = '';
+  renderStopList();
+};
+function removeStop(id){
+  selectedStops = selectedStops.filter(s=>s.id!==id);
+  renderStopList();
+}
+function renderStopList(){
+  const el = document.getElementById('stopList');
+  if(selectedStops.length===0){
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:6px 0">No stops added yet — pick a delivery below and click "Add Location".</p>';
+    return;
+  }
+  el.innerHTML = selectedStops.map((s,i)=>`
+    <div class="stop-row">
+      <span class="n">${i+1}</span>
+      <span class="txt"><b>${s.name}</b><span>${s.addr}</span></span>
+      <button type="button" class="x-remove" onclick="removeStop('${s.id}')">✕</button>
+    </div>`).join('');
+}
+
+/* ---------------- Route drawing ---------------- */
 function drawGoogleRoute(route){
   if(route.length < 2 || !dirService) return;
   const wp = route.slice(1,-1).map(x=>({location:{lat:x.latitude,lng:x.longitude}, stopover:true}));
@@ -123,42 +180,68 @@ function drawLeafletRoute(route){
   if(latlngs.length) lmap.fitBounds(latlngs, {padding:[30,30]});
 }
 function drawRoute(route){
-  // map drawing is best-effort and must never affect the results panel above
-  try{
-    if(usingGoogle) drawGoogleRoute(route); else drawLeafletRoute(route);
-  }catch(e){ console.warn('Map draw failed (results are still valid):', e); }
+  try{ if(usingGoogle) drawGoogleRoute(route); else drawLeafletRoute(route); }
+  catch(e){ console.warn('Map draw failed (results are still valid):', e); }
 }
 
-document.getElementById('go').onclick = async () => {
-  const boxes=[...document.querySelectorAll('.delivery-check:checked')];
-  const ids=boxes.map(x=>x.value);
+/* ---------------- Optimize call ---------------- */
+async function computeRoute(){
   const err=document.getElementById('err');
   err.style.display='none';
+  if(selectedStops.length < 2){
+    err.textContent = 'Add at least two delivery locations first.'; err.style.display='block';
+    return;
+  }
   try{
     const r = await fetch('{{url_for("api_optimize")}}', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({delivery_ids:ids, algorithm:document.getElementById('algorithm').value})
+      body: JSON.stringify({delivery_ids:selectedStops.map(s=>s.id), algorithm:document.getElementById('algorithm').value})
     });
     const d = await r.json();
     if(!r.ok) throw new Error(d.error);
+    lastRoute = d;
 
     document.getElementById('results').style.display='block';
+    const hrs = Math.floor(d.estimated_minutes/60), mins = d.estimated_minutes%60;
+    const timeLabel = hrs>0 ? `${hrs}h ${mins}min` : `${mins} min`;
+    const dateLabel = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
     const m = [
-      ['Algorithm', d.algorithm], ['Before', d.before_distance+' km'],
-      ['Optimized', d.total_distance+' km'], ['Saved', d.distance_saved+' km'],
-      ['Improvement', d.improvement+'%'], ['Execution', d.execution_ms+' ms']
+      ['Total Distance', d.total_distance+' km'],
+      ['Estimated Time', timeLabel],
+      ['Total Stops', d.route.length-1],
+      ['Algorithm', d.algorithm],
+      ['Date', dateLabel]
     ];
     document.getElementById('metrics').innerHTML = m.map(x=>
-      `<div class="metric-box"><small>${x[0]}</small><strong>${x[1]}</strong></div>`
+      `<div class="metric-box"><small>${x[0]}</small><strong style="${x[0]==='Algorithm'?'color:var(--primary)':''}">${x[1]}</strong></div>`
     ).join('');
     document.getElementById('route-list').innerHTML = d.route.map((x,i)=>
-      `<li><span class="n">${i+1}</span>${(i===d.route.length-1)?'Return to Depot':x.customer_name+' — '+x.address}</li>`
+      `<li><span class="n">${i+1}</span>${(i===d.route.length-1)?'Return to Start':x.customer_name+' — '+x.address}${i>0 && i<d.route.length-1 ? `<button type="button" class="x-remove" onclick="removeStop('${x.id}');computeRoute()">✕</button>`:''}</li>`
     ).join('');
 
     drawRoute(d.route);
   }catch(x){
     err.textContent = x.message; err.style.display='block';
   }
+}
+document.getElementById('go').onclick = computeRoute;
+
+/* ---------------- Print / Download ---------------- */
+document.getElementById('printBtn').onclick = () => window.print();
+document.getElementById('downloadBtn').onclick = () => {
+  if(!lastRoute) return;
+  let csv = 'Stop,Location,Address,Latitude,Longitude\n';
+  lastRoute.route.forEach((r,i)=>{
+    const label = (i===lastRoute.route.length-1) ? 'Return to Start' : (i+1);
+    csv += `${label},"${r.customer_name}","${r.address}",${r.latitude},${r.longitude}\n`;
+  });
+  csv += `\nTotal Distance,${lastRoute.total_distance} km\n`;
+  csv += `Algorithm,${lastRoute.algorithm}\n`;
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'optimized_route.csv';
+  a.click();
 };
 </script>
 {% endblock %}

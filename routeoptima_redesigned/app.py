@@ -9,6 +9,9 @@ DB_PATH = os.path.join(BASE_DIR, 'dispatch_tsp.db')
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret-key')
 GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', 'YOUR_GOOGLE_MAPS_API_KEY')
+DEPOT_NAME = 'Ikeja City Mall, Lagos, Nigeria'
+DEPOT_COORDS = (4.8156, 7.0498)
+AVG_SPEED_KMH = 25
 
 def db():
     if 'db' not in g:
@@ -49,6 +52,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         phone TEXT NOT NULL,
+        vehicle TEXT,
         status TEXT NOT NULL DEFAULT 'Available',
         latitude REAL,
         longitude REAL,
@@ -77,19 +81,23 @@ def init_db():
         FOREIGN KEY(rider_id) REFERENCES riders(id) ON DELETE SET NULL
     );
     ''')
+    try:
+        c.execute('ALTER TABLE riders ADD COLUMN vehicle TEXT')
+    except sqlite3.OperationalError:
+        pass
     now = datetime.now().isoformat(timespec='seconds')
     if c.execute('SELECT COUNT(*) FROM admins').fetchone()[0] == 0:
         c.execute('INSERT INTO admins(username,password_hash,created_at) VALUES(?,?,?)',
                   ('admin', hash_password('admin123'), now))
     if c.execute('SELECT COUNT(*) FROM riders').fetchone()[0] == 0:
         rows = [
-            ('Chinedu Okafor', '08030000001', 'Available', 4.8156, 7.0498),
-            ('Emeka Nwosu', '08030000002', 'On Delivery', 4.825, 7.033),
-            ('Daniel George', '08030000003', 'Available', 4.84, 7.015),
-            ('Samuel Johnson', '08030000004', 'Available', 4.79, 7.04)
+            ('Chinedu Okafor', '08030000001', 'Honda CB125', 'Available', 4.8156, 7.0498),
+            ('Emeka Nwosu', '08030000002', 'Bajaj Boxer BM150', 'On Delivery', 4.825, 7.033),
+            ('Daniel George', '08030000003', 'TVS Apache 180', 'Available', 4.84, 7.015),
+            ('Samuel Johnson', '08030000004', 'Bajaj Discover 125', 'Available', 4.79, 7.04)
         ]
-        c.executemany('INSERT INTO riders(name,phone,status,latitude,longitude,created_at) VALUES(?,?,?,?,?,?)',
-                      [(a, b, d, e, f, now) for a, b, d, e, f in rows])
+        c.executemany('INSERT INTO riders(name,phone,vehicle,status,latitude,longitude,created_at) VALUES(?,?,?,?,?,?,?)',
+                      [(a, b, v, d, e, f, now) for a, b, v, d, e, f in rows])
     if c.execute('SELECT COUNT(*) FROM deliveries').fetchone()[0] == 0:
         rows = [
             ('Customer 001', 'GRA Phase 2', 4.8156, 7.0498),
@@ -250,15 +258,24 @@ def riders():
     c = db()
     if request.method == 'POST':
         c.execute(
-            'INSERT INTO riders(name,phone,status,latitude,longitude,created_at) VALUES(?,?,?,?,?,?)',
-            (request.form['name'], request.form['phone'], request.form['status'],
+            'INSERT INTO riders(name,phone,vehicle,status,latitude,longitude,created_at) VALUES(?,?,?,?,?,?,?)',
+            (request.form['name'], request.form['phone'], request.form.get('vehicle', ''), request.form['status'],
              float(request.form['latitude']), float(request.form['longitude']),
              datetime.now().isoformat(timespec='seconds'))
         )
         c.commit()
         flash('Rider added successfully.', 'success')
         return redirect(url_for('riders'))
-    return render_template('riders.html', riders=c.execute('SELECT * FROM riders ORDER BY id DESC').fetchall())
+    rows = c.execute(
+        'SELECT r.*, COUNT(d.id) deliveries_count FROM riders r LEFT JOIN deliveries d ON d.rider_id=r.id '
+        'GROUP BY r.id ORDER BY r.id DESC'
+    ).fetchall()
+    return render_template('riders.html', riders=rows)
+
+@app.route('/riders/add')
+@login_required
+def add_rider_page():
+    return render_template('add_rider.html')
 
 @app.route('/riders/delete/<int:rider_id>', methods=['POST'])
 @login_required
@@ -280,10 +297,11 @@ def edit_rider(rider_id):
 
     if request.method == 'POST':
         c.execute('''UPDATE riders 
-                      SET name=?, phone=?, status=?, latitude=?, longitude=? 
+                      SET name=?, phone=?, vehicle=?, status=?, latitude=?, longitude=? 
                       WHERE id=?''',
                   (request.form['name'],
                    request.form['phone'],
+                   request.form.get('vehicle', ''),
                    request.form['status'],
                    float(request.form['latitude']),
                    float(request.form['longitude']),
@@ -335,7 +353,7 @@ def delivery_status(delivery_id):
 @app.route('/optimize')
 @login_required
 def optimize():
-    return render_template('optimize.html', deliveries=db().execute("SELECT * FROM deliveries WHERE status!='Delivered' ORDER BY id").fetchall())
+    return render_template('optimize.html', deliveries=db().execute("SELECT * FROM deliveries WHERE status!='Delivered' ORDER BY id").fetchall(), depot_name=DEPOT_NAME)
 
 @app.route('/api/optimize', methods=['POST'])
 @login_required
@@ -372,6 +390,7 @@ def api_optimize():
         (used, len(points), d, ms, json.dumps(route), datetime.now().isoformat(timespec='seconds'))
     )
     db().commit()
+    est_minutes = round(d / AVG_SPEED_KMH * 60)
     return jsonify(
         route=route,
         algorithm=used,
@@ -379,7 +398,8 @@ def api_optimize():
         before_distance=round(bd, 3),
         distance_saved=round(saved, 3),
         improvement=round(imp, 2),
-        execution_ms=round(ms, 3)
+        execution_ms=round(ms, 3),
+        estimated_minutes=est_minutes
     )
 
 @app.route('/history')

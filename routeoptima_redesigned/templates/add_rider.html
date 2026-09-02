@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="card card-pad" style="max-width:700px">
+  <div class="section-title">
+    <div>
+      <h2>Add a rider</h2>
+      <p>Register a new dispatch rider and their starting location</p>
+    </div>
+  </div>
+
+  <form method="post" action="{{ url_for('riders') }}">
+    <div class="form-row">
+      <div>
+        <label class="f-label">Name</label>
+        <input class="f-input" name="name" placeholder="e.g. Chinedu Okafor" required>
+      </div>
+      <div>
+        <label class="f-label">Phone</label>
+        <input class="f-input" name="phone" placeholder="0803 000 0001" required>
+      </div>
+      <div>
+        <label class="f-label">Vehicle</label>
+        <input class="f-input" name="vehicle" placeholder="e.g. Honda CB125">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="f-label">Status</label>
+        <select class="f-input" name="status">
+          <option>Available</option>
+          <option>On Delivery</option>
+          <option>Offline</option>
+        </select>
+      </div>
+      <div>
+        <label class="f-label">Latitude</label>
+        <input class="f-input" name="latitude" placeholder="4.8156" required>
+      </div>
+      <div>
+        <label class="f-label">Longitude</label>
+        <input class="f-input" name="longitude" placeholder="7.0498" required>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button type="submit" class="btn btn-primary">Add Rider</button>
+      <a href="{{ url_for('riders') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

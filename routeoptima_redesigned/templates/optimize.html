@@ -106,47 +106,62 @@ let usingGoogle = false, mapReady = false, map2Ready = false;
 let selectedStops = [];
 let lastRoute = null;
 
-/* ------------- Numbered pin SVG for Leaflet ------------- */
-function pinIcon(number, color){
-  color = color || '#e0405a';
+/* ------------- Stacked pin SVG: red teardrop on top + blue pill with white number underneath ------------- */
+/* Matches the reference illustration exactly. */
+function pinSvg(number, isDepot){
+  const n = String(number);
+  const numFill = isDepot ? '#ffffff' : '#ffffff';
+  const numberLabel = isDepot ? (typeof number === 'number' ? n : n) : n;
   const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
+  <svg xmlns="http://www.w3.org/2000/svg" width="42" height="64" viewBox="0 0 42 64">
     <defs>
-      <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.2"/>
+      <filter id="ds1" x="-80%" y="-80%" width="260%" height="260%">
+        <feDropShadow dx="0" dy="2.5" stdDeviation="1.8" flood-color="#000" flood-opacity="0.28"/>
       </filter>
+      <radialGradient id="redPinG" cx="40%" cy="30%" r="70%">
+        <stop offset="0%" stop-color="#ff6b6b"/>
+        <stop offset="55%" stop-color="#e0273a"/>
+        <stop offset="100%" stop-color="#b81528"/>
+      </radialGradient>
     </defs>
-    <path filter="url(#s)" fill="${color}" stroke="#fff" stroke-width="2.5"
-      d="M18 2c8.3 0 15 6.7 15 15 0 11.2-15 27-15 27S3 28.2 3 17C3 8.7 9.7 2 18 2z"/>
-    <circle cx="18" cy="17" r="10" fill="#fff"/>
-    <text x="18" y="21" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="13" font-weight="800" fill="${color}">${number}</text>
+
+    <!-- Blue pill (bottom base): wide circular pill with bold white number -->
+    <g filter="url(#ds1)">
+      <rect x="5" y="46" width="32" height="15" rx="7.5" fill="#2130b8" stroke="#ffffff" stroke-width="2.2"/>
+      <text x="21" y="57.5" text-anchor="middle"
+        font-family="Arial, 'Plus Jakarta Sans', sans-serif" font-size="12.5"
+        font-weight="900" fill="${numFill}" letter-spacing="0">${numberLabel}</text>
+    </g>
+
+    <!-- Red Google-style teardrop pin (upper part) -->
+    <g filter="url(#ds1)">
+      <path fill="url(#redPinG)" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round"
+        d="M21 2c7.7 0 14 6.3 14 14.1 0 10.5-14 26-14 26S7 26.6 7 16.1C7 8.3 13.3 2 21 2z"/>
+      <circle cx="21" cy="16" r="5.4" fill="#ffffff"/>
+      <circle cx="21" cy="16" r="2.6" fill="#e0273a"/>
+    </g>
   </svg>`;
+  return svg;
+}
+
+/* Leaflet icon wrapper */
+function pinIconLeaflet(number, isDepot){
   return L.divIcon({
     className:'custom-pin',
-    html:svg,
-    iconSize:[36,46],
-    iconAnchor:[18,44],
-    popupAnchor:[0,-42]
+    html: pinSvg(number, isDepot),
+    iconSize:[42, 64],
+    iconAnchor:[21, 62],
+    popupAnchor:[0, -56]
   });
 }
-function depotPin(){
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
-    <defs><filter id="s2" x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.2"/>
-    </filter></defs>
-    <path filter="url(#s2)" fill="#3647c9" stroke="#fff" stroke-width="2.5"
-      d="M18 2c8.3 0 15 6.7 15 15 0 11.2-15 27-15 27S3 28.2 3 17C3 8.7 9.7 2 18 2z"/>
-    <circle cx="18" cy="17" r="10" fill="#fff"/>
-    <text x="18" y="21" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="12" font-weight="900" fill="#3647c9">D</text>
-  </svg>`;
-  return L.divIcon({
-    className:'custom-pin',
-    html:svg,
-    iconSize:[36,46],
-    iconAnchor:[18,44],
-    popupAnchor:[0,-42]
-  });
+/* Google Maps data-URL icon wrapper */
+function pinIconGoogle(number, isDepot){
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(pinSvg(number, isDepot)),
+    scaledSize: new google.maps.Size(42, 64),
+    anchor: new google.maps.Point(21, 62),
+    labelOrigin: new google.maps.Point(21, 56)
+  };
 }
 
 /* ---------------- Map init ---------------- */
@@ -253,46 +268,49 @@ function renderStopList(){
 function redrawMapStops(){
   if(!mapReady) return;
   if(usingGoogle){
-    // Google: place markers and polyline
     if(window._gMarkers) window._gMarkers.forEach(m=>m.setMap(null));
     if(window._gLine) window._gLine.setMap(null);
     const markers = [];
     const path = [{lat:DEPOT.lat,lng:DEPOT.lng}];
-    const labelColors = ['#e0405a','#3647c9','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
     const depotMarker = new google.maps.Marker({
-      position:DEPOT, map:gmap, label:{text:'D', color:'#3647c9', fontWeight:'800', fontSize:'12px'},
-      title:DEPOT.name
+      position:DEPOT, map:gmap,
+      icon: pinIconGoogle(1, true),
+      title: DEPOT.name
     });
     markers.push(depotMarker);
     selectedStops.forEach((s,i)=>{
-      const c = labelColors[i % labelColors.length];
       const m = new google.maps.Marker({
         position:{lat:s.lat,lng:s.lng}, map:gmap,
-        label:{text:String(i+1), color:c, fontWeight:'800', fontSize:'12px'},
+        icon: pinIconGoogle(i+2, false),
         title: `${i+1}. ${s.name}`
       });
       markers.push(m);
       path.push({lat:s.lat,lng:s.lng});
     });
     path.push({lat:DEPOT.lat,lng:DEPOT.lng});
-    window._gLine = new google.maps.Polyline({path, strokeColor:'#3647c9', strokeWeight:3, strokeOpacity:0.75, map:gmap});
+    window._gLine = new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:5, strokeOpacity:0.95, map:gmap});
     window._gMarkers = markers;
+    if(path.length > 3){
+      try{
+        const b = new google.maps.LatLngBounds();
+        path.forEach(p=>b.extend(p));
+        gmap.fitBounds(b, 50);
+      }catch(_){}
+    }
   } else if(lmap){
     lMarkers.clearLayers();
     const latlngs = [[DEPOT.lat, DEPOT.lng]];
-    L.marker([DEPOT.lat, DEPOT.lng], {icon:depotPin()}).bindPopup('<b>Start</b><br>'+DEPOT.name).addTo(lMarkers);
-    const palette = ['#e0405a','#3647c9','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
+    L.marker([DEPOT.lat, DEPOT.lng], {icon:pinIconLeaflet(1, true)}).bindPopup('<b>Start</b><br>'+DEPOT.name).addTo(lMarkers);
     selectedStops.forEach((s,i)=>{
-      const c = palette[i % palette.length];
-      L.marker([s.lat, s.lng], {icon:pinIcon(i+1, c)}).bindPopup(`<b>${i+1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
+      L.marker([s.lat, s.lng], {icon:pinIconLeaflet(i+2, false)}).bindPopup(`<b>${i+1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
       latlngs.push([s.lat, s.lng]);
     });
     if(selectedStops.length > 0){
       latlngs.push([DEPOT.lat, DEPOT.lng]);
-      L.polyline(latlngs, {color:'#3647c9', weight:3.5, opacity:0.75, dashArray:'8 5'}).addTo(lMarkers);
+      L.polyline(latlngs, {color:'#2130b8', weight:5, opacity:0.95}).addTo(lMarkers);
     }
-    if(latlngs.length > 2){
-      try{ lmap.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }catch(_){}
+    if(latlngs.length > 3){
+      try{ lmap.fitBounds(L.latLngBounds(latlngs).pad(0.28)); }catch(_){}
     }
   }
 }
@@ -367,21 +385,22 @@ document.getElementById('go').onclick = computeRoute;
 /* ---------------- After-optimization drawing ---------------- */
 function drawGoogleRouteResult(route, map){
   if(route.length < 2 || !window.google || !map) return;
-  const labelColors = ['#3647c9','#e0405a','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
   route.forEach((x,i)=>{
     if(x.is_depot_start){
-      new google.maps.Marker({position:{lat:x.latitude,lng:x.longitude}, map, label:{text:'1', color:'#3647c9', fontWeight:'800'}, title: '1. Start'});
+      new google.maps.Marker({
+        position:{lat:x.latitude,lng:x.longitude}, map,
+        icon: pinIconGoogle(1, true), title: '1. Start'
+      });
     } else if(x.is_depot_end){
-      // skip duplicate depot pin (start already there)
+      // skip duplicate depot pin (start pin 1 already there)
     } else {
-      const idx = i;
-      const c = labelColors[idx % labelColors.length];
-      new google.maps.Marker({position:{lat:x.latitude,lng:x.longitude}, map,
-        label:{text:String(i+1), color:c, fontWeight:'800'},
-        title: `${i+1}. ${x.customer_name}`});
+      new google.maps.Marker({
+        position:{lat:x.latitude,lng:x.longitude}, map,
+        icon: pinIconGoogle(i+1, false),
+        title: `${i+1}. ${x.customer_name}`
+      });
     }
   });
-  // Use Directions if possible
   if(dirService){
     const origin = {lat:route[0].latitude, lng:route[0].longitude};
     const destination = {lat:route[route.length-1].latitude, lng:route[route.length-1].longitude};
@@ -391,38 +410,47 @@ function drawGoogleRouteResult(route, map){
         (res,status)=>{
           if(status==='OK'){
             new google.maps.DirectionsRenderer({map, directions:res, suppressMarkers:true,
-              polylineOptions:{strokeColor:'#3647c9', strokeWeight:4, strokeOpacity:0.9}});
+              polylineOptions:{strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95}});
           } else {
             const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
-            new google.maps.Polyline({path, strokeColor:'#3647c9', strokeWeight:4, strokeOpacity:0.9, map});
+            new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95, map});
           }
         });
     }catch(_){
       const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
-      new google.maps.Polyline({path, strokeColor:'#3647c9', strokeWeight:4, strokeOpacity:0.9, map});
+      new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95, map});
     }
+  } else {
+    const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
+    new google.maps.Polyline({path, strokeColor:'#2130b8', strokeWeight:6, strokeOpacity:0.95, map});
   }
+  // Fit bounds
+  try{
+    const b = new google.maps.LatLngBounds();
+    route.forEach(x=>b.extend({lat:x.latitude,lng:x.longitude}));
+    map.fitBounds(b, 60);
+  }catch(_){}
 }
 function drawLeafletRouteResult(route){
   if(!lmap2 || !lMarkers2) return;
   setTimeout(()=>lmap2.invalidateSize(), 150);
   lMarkers2.clearLayers();
-  const palette = ['#3647c9','#e0405a','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
   const latlngs = [];
   route.forEach((x,i)=>{
     latlngs.push([x.latitude, x.longitude]);
     if(x.is_depot_start){
-      L.marker([x.latitude, x.longitude], {icon:pinIcon(1, palette[0])}).bindPopup('<b>1. Start</b><br>'+x.customer_name).addTo(lMarkers2);
+      L.marker([x.latitude, x.longitude], {icon:pinIconLeaflet(1, true)})
+        .bindPopup('<b>1. Start</b><br>'+x.customer_name).addTo(lMarkers2);
     } else if(x.is_depot_end){
       // skip
     } else {
-      const c = palette[i % palette.length];
-      L.marker([x.latitude, x.longitude], {icon:pinIcon(i+1, c)}).bindPopup(`<b>${i+1}. ${x.customer_name}</b><br>${x.address||''}`).addTo(lMarkers2);
+      L.marker([x.latitude, x.longitude], {icon:pinIconLeaflet(i+1, false)})
+        .bindPopup(`<b>${i+1}. ${x.customer_name}</b><br>${x.address||''}`).addTo(lMarkers2);
     }
   });
-  L.polyline(latlngs, {color:'#3647c9', weight:5, opacity:0.92}).addTo(lMarkers2);
+  L.polyline(latlngs, {color:'#2130b8', weight:6, opacity:0.95}).addTo(lMarkers2);
   if(latlngs.length){
-    try{ lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }catch(_){}
+    try{ lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.3)); }catch(_){}
   }
 }
 

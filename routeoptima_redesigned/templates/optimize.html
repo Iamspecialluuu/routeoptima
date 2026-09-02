@@ -1,18 +1,117 @@
+{% extends 'base.html' %}
+{% import '_icons.html' as ic %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="beforeView">
+  <div class="welcome-header" style="margin-bottom:22px">
+    <h1 class="welcome-title">Optimize Delivery Route</h1>
+    <p class="welcome-sub">Enter pickup location and delivery points</p>
+  </div>
+
+  <div class="grid grid-split">
+    <div class="card card-pad" style="padding:24px">
+      <div class="opt-field-wrap">
+        <label class="opt-field-label">Pickup Location</label>
+        <input class="opt-depot-input" value="{{ depot_name }}" readonly>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:22px 0 10px">
+        <label class="opt-field-label" style="margin:0">Delivery Locations</label>
+        <select id="algorithm" class="opt-algo-select">
+          <option value="auto">Auto Algorithm</option>
+          <option value="exact">Exact TSP</option>
+          <option value="nearest">Nearest Neighbour</option>
+        </select>
+      </div>
+
+      <div id="stopList" style="margin-top:4px"></div>
+
+      <div class="add-location-row" style="margin-top:8px">
+        <select id="addSelect" class="opt-add-select">
+          <option value="">Select a delivery to add…</option>
+          {% for d in deliveries %}
+          <option value="{{ d.id }}"
+                  data-lat="{{ d.latitude }}"
+                  data-lng="{{ d.longitude }}"
+                  data-name="{{ d.customer_name|e }}"
+                  data-addr="{{ d.address|e }}">
+            {{ d.customer_name }} — {{ d.address }}
+          </option>
+          {% endfor %}
+        </select>
+        <button type="button" id="addStopBtn" class="opt-add-btn">{{ ic.icon('plus') }} Add Location</button>
+      </div>
+
+      <button id="go" class="btn-optimize-primary">Optimize Route</button>
+      <div id="err" class="flash flash-danger" style="display:none;margin-top:12px"></div>
+    </div>
+
+    <div class="map-col">
+      <div class="map-wrap">
+        <div class="map-toggle" id="mapToggle">
+          <button type="button" data-mode="map" class="active">Map</button>
+          <button type="button" data-mode="satellite">Satellite</button>
+        </div>
+        <div id="map" style="height:500px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="afterView" style="display:none">
+  <div class="welcome-header" style="margin-bottom:22px">
+    <h1 class="welcome-title">Optimization Result</h1>
+  </div>
+
+  <div id="metricsRow" class="grid metrics-grid" style="margin-bottom:24px"></div>
+
+  <div class="grid grid-split">
+    <div class="card card-pad" style="padding:24px">
+      <label class="opt-field-label" style="margin-bottom:12px;display:block">Optimized Visit Order</label>
+      <div id="route-list"></div>
+
+      <div style="display:flex;gap:12px;margin-top:24px">
+        <button type="button" id="printBtn" class="btn-print">{{ ic.icon('reports') }} Print</button>
+        <button type="button" id="downloadBtn" class="btn-download">{{ ic.icon('optimize') }} Download Route</button>
+      </div>
+    </div>
+
+    <div class="map-col">
+      <div class="map-wrap">
+        <div class="map-toggle" id="mapToggle2">
+          <button type="button" data-mode="map" class="active">Map</button>
+          <button type="button" data-mode="satellite">Satellite</button>
+        </div>
+        <div id="map2" style="height:500px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block scripts %}
 <script>
-const HAS_GOOGLE = {{ 'true' if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' else 'false' }};
-const DEPOT = {lat:4.8156, lng:7.0498, name:{{depot_name|tojson}}};
-let gmap, dirService, dirRenderer, gmap2;
-let lmap, lSatellite, lStreets, lMarkers, lLines;
-let lmap2, lSatellite2, lStreets2, lMarkers2, lLines2;
-let usingGoogle = false, mapReady = false, map2Ready = false;
+const DEPOT = {
+  lat: 4.8156,
+  lng: 7.0498,
+  name: {{ depot_name|tojson }}
+};
+
+let lmap, lmap2;
+let lStreets, lSatellite, lStreets2, lSatellite2;
+let lMarkers, lLines, lMarkers2, lLines2;
 let selectedStops = [];
 let lastRoute = null;
+let mapReady = false;
 
-/* ------------- Custom pin SVG ------------- */
-function pinSvg(number, isDepot){
-  const n = String(number);
-  const svg = `
+/* ---------- Custom Pin ---------- */
+function pinSvg(number) {
+  return `
   <svg xmlns="http://www.w3.org/2000/svg" width="42" height="64" viewBox="0 0 42 64">
     <defs>
       <filter id="ds1" x="-80%" y="-80%" width="260%" height="260%">
@@ -26,9 +125,7 @@ function pinSvg(number, isDepot){
     </defs>
     <g filter="url(#ds1)">
       <rect x="5" y="46" width="32" height="15" rx="7.5" fill="#2130b8" stroke="#ffffff" stroke-width="2.2"/>
-      <text x="21" y="57.5" text-anchor="middle"
-        font-family="Arial, sans-serif" font-size="12.5"
-        font-weight="900" fill="#ffffff">${n}</text>
+      <text x="21" y="57.5" text-anchor="middle" font-family="Arial" font-size="12.5" font-weight="900" fill="#ffffff">${number}</text>
     </g>
     <g filter="url(#ds1)">
       <path fill="url(#redPinG)" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round"
@@ -37,10 +134,9 @@ function pinSvg(number, isDepot){
       <circle cx="21" cy="16" r="2.6" fill="#e0273a"/>
     </g>
   </svg>`;
-  return svg;
 }
 
-function pinIconLeaflet(number){
+function pinIcon(number) {
   return L.divIcon({
     className: 'custom-pin',
     html: pinSvg(number),
@@ -50,353 +146,272 @@ function pinIconLeaflet(number){
   });
 }
 
-function pinIconGoogle(number){
-  return {
-    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(pinSvg(number)),
-    scaledSize: new google.maps.Size(42, 64),
-    anchor: new google.maps.Point(21, 62)
-  };
-}
-
-/* ---------------- Map initialization ---------------- */
-function initLeafletMap(){
-  if (typeof L === 'undefined') { mapFailed(); return; }
-  try {
-    lmap = L.map('map', {zoomControl: true}).setView([DEPOT.lat, DEPOT.lng], 12);
-    lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap', maxZoom: 19
-    }).addTo(lmap);
-    lSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri', maxZoom: 19
-    });
-    lLines = L.layerGroup().addTo(lmap);
-    lMarkers = L.layerGroup().addTo(lmap);
-    usingGoogle = false;
-    mapReady = true;
-    setupToggle('mapToggle', lmap, lStreets, lSatellite);
-    setTimeout(() => lmap.invalidateSize(), 300);
-    redrawMapStops();
-  } catch(e) {
-    console.warn('Leaflet failed:', e);
-    mapFailed();
-  }
-}
-
-function initLeafletMap2(){
-  if (typeof L === 'undefined') return;
-  try {
-    // Destroy previous map if it exists
-    if (lmap2) {
-      lmap2.remove();
-      lmap2 = null;
-    }
-
-    lmap2 = L.map('map2', {zoomControl: true}).setView([DEPOT.lat, DEPOT.lng], 12);
-    lStreets2 = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap', maxZoom: 19
-    }).addTo(lmap2);
-    lSatellite2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri', maxZoom: 19
-    });
-    lLines2 = L.layerGroup().addTo(lmap2);
-    lMarkers2 = L.layerGroup().addTo(lmap2);
-    map2Ready = true;
-    setupToggle('mapToggle2', lmap2, lStreets2, lSatellite2);
-  } catch(e) {
-    console.warn('Leaflet map2 failed:', e);
-  }
-}
-
-function setupToggle(id, map, streets, sat){
+/* ---------- Map Setup ---------- */
+function setupToggle(id, map, streets, sat) {
   const bar = document.getElementById(id);
   if (!bar) return;
-  bar.addEventListener('click', (e) => {
+  bar.addEventListener('click', e => {
     const btn = e.target.closest('button');
     if (!btn) return;
     bar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    try {
-      if (btn.dataset.mode === 'satellite') {
-        map.removeLayer(streets);
-        sat.addTo(map);
-      } else {
-        map.removeLayer(sat);
-        streets.addTo(map);
-      }
-    } catch(_) {}
+    if (btn.dataset.mode === 'satellite') {
+      map.removeLayer(streets);
+      sat.addTo(map);
+    } else {
+      map.removeLayer(sat);
+      streets.addTo(map);
+    }
   });
 }
 
-function mapFailed(){
-  const el = document.getElementById('map');
-  if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:14px;text-align:center;padding:20px">Map unavailable</div>';
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  if (HAS_GOOGLE) {
-    // Google will call initGoogleMap via callback
-    setTimeout(() => { if (!mapReady) initLeafletMap(); }, 4000);
-  } else {
-    initLeafletMap();
-  }
-  renderStopList();
-});
-
-/* ---------------- Stop list ---------------- */
-document.getElementById('addStopBtn').onclick = () => {
-  const sel = document.getElementById('addSelect');
-  const opt = sel.options[sel.selectedIndex];
-  if (!opt || !opt.value) return;
-  const id = opt.value;
-  if (selectedStops.find(s => s.id === id)) return;
-  selectedStops.push({
-    id,
-    name: opt.dataset.name,
-    addr: opt.dataset.addr,
-    lat: parseFloat(opt.dataset.lat),
-    lng: parseFloat(opt.dataset.lng)
+function initMap1() {
+  lmap = L.map('map').setView([DEPOT.lat, DEPOT.lng], 12);
+  lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(lmap);
+  lSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri', maxZoom: 19
   });
-  sel.value = '';
-  renderStopList();
+  lMarkers = L.layerGroup().addTo(lmap);
+  lLines = L.layerGroup().addTo(lmap);
+  setupToggle('mapToggle', lmap, lStreets, lSatellite);
+  mapReady = true;
+  setTimeout(() => lmap.invalidateSize(), 200);
   redrawMapStops();
-};
+}
 
-function removeStop(id){
+function initMap2() {
+  if (lmap2) {
+    lmap2.remove();
+  }
+  lmap2 = L.map('map2').setView([DEPOT.lat, DEPOT.lng], 12);
+  lStreets2 = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(lmap2);
+  lSatellite2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri', maxZoom: 19
+  });
+  lMarkers2 = L.layerGroup().addTo(lmap2);
+  lLines2 = L.layerGroup().addTo(lmap2);
+  setupToggle('mapToggle2', lmap2, lStreets2, lSatellite2);
+}
+
+/* ---------- Stop List ---------- */
+function renderStopList() {
+  const el = document.getElementById('stopList');
+  if (!el) return;
+
+  if (selectedStops.length === 0) {
+    el.innerHTML = `<p style="color:#888;text-align:center;padding:20px;border:1px dashed #ccc;border-radius:8px;">
+      No stops added yet.<br>Select a delivery and click "Add Location"
+    </p>`;
+    return;
+  }
+
+  el.innerHTML = selectedStops.map((s, i) => `
+    <div class="opt-loc-row">
+      <span class="opt-loc-num">${i + 1}</span>
+      <span class="opt-loc-txt"><b>${s.name}</b><span>${s.addr}</span></span>
+      <button type="button" class="x-remove" onclick="removeStop('${s.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeStop(id) {
   selectedStops = selectedStops.filter(s => s.id !== id);
   renderStopList();
   redrawMapStops();
 }
 
-function renderStopList(){
-  const el = document.getElementById('stopList');
-  if (selectedStops.length === 0) {
-    el.innerHTML = `<p style="color:var(--text-muted);font-size:13px;margin:6px 0 4px;text-align:center;padding:22px 8px;border:1px dashed var(--border-strong);border-radius:10px;background:var(--bg)">
-      No stops added yet.<br>Select a delivery below and click "Add Location".
-    </p>`;
-    return;
-  }
-  el.innerHTML = selectedStops.map((s, i) => `
-    <div class="opt-loc-row">
-      <span class="opt-loc-num">${i+1}</span>
-      <span class="opt-loc-txt"><b>${s.name}</b><span>${s.addr}</span></span>
-      <button type="button" class="x-remove" onclick="removeStop('${s.id}')">✕</button>
-    </div>`).join('');
-}
-
-/* ---------------- BEFORE optimization map ---------------- */
-function redrawMapStops(){
+/* ---------- Draw before optimization ---------- */
+function redrawMapStops() {
   if (!mapReady || !lmap) return;
 
   lMarkers.clearLayers();
   lLines.clearLayers();
 
-  const latlngs = [[DEPOT.lat, DEPOT.lng]];
+  const points = [[DEPOT.lat, DEPOT.lng]];
 
-  // Depot
+  // Depot pin
   L.marker([DEPOT.lat, DEPOT.lng], {
-    icon: pinIconLeaflet(1),
+    icon: pinIcon(1),
     zIndexOffset: 9999
-  }).bindPopup('<b>Start</b><br>' + DEPOT.name).addTo(lMarkers);
+  }).bindPopup(`<b>Start</b><br>${DEPOT.name}`).addTo(lMarkers);
 
   selectedStops.forEach((s, i) => {
     L.marker([s.lat, s.lng], {
-      icon: pinIconLeaflet(i + 2),
-      zIndexOffset: 9000 + i
-    }).bindPopup(`<b>${i+1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
-    latlngs.push([s.lat, s.lng]);
+      icon: pinIcon(i + 2)
+    }).bindPopup(`<b>${i + 1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
+    points.push([s.lat, s.lng]);
   });
 
   if (selectedStops.length > 0) {
-    latlngs.push([DEPOT.lat, DEPOT.lng]);
+    points.push([DEPOT.lat, DEPOT.lng]);
 
-    L.polyline(latlngs, {
-      color: '#ffffff',
-      weight: 15,
-      opacity: 1,
-      lineJoin: 'round',
-      interactive: false
-    }).addTo(lLines);
-
-    L.polyline(latlngs, {
-      color: '#1629ff',
-      weight: 9,
-      opacity: 1,
-      lineJoin: 'round',
-      interactive: false
-    }).addTo(lLines);
+    L.polyline(points, { color: '#ffffff', weight: 15, opacity: 1 }).addTo(lLines);
+    L.polyline(points, { color: '#1629ff', weight: 9, opacity: 1 }).addTo(lLines);
   }
 
-  if (latlngs.length > 2) {
-    try { lmap.fitBounds(L.latLngBounds(latlngs).pad(0.3)); } catch(_) {}
+  if (points.length > 2) {
+    lmap.fitBounds(points, { padding: [40, 40] });
   }
 }
 
-/* ---------------- Optimize ---------------- */
-async function computeRoute(){
-  const err = document.getElementById('err');
-  err.style.display = 'none';
-
-  if (selectedStops.length < 2) {
-    err.textContent = 'Add at least two delivery locations first.';
-    err.style.display = 'block';
-    return;
-  }
-
-  try {
-    const r = await fetch('{{ url_for("api_optimize") }}', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        delivery_ids: selectedStops.map(s => s.id),
-        algorithm: document.getElementById('algorithm').value
-      })
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Optimization failed');
-    lastRoute = d;
-
-    // Switch views
-    document.getElementById('beforeView').style.display = 'none';
-    document.getElementById('afterView').style.display = 'block';
-
-    // Metrics
-    const hrs = Math.floor(d.estimated_minutes / 60);
-    const mins = d.estimated_minutes % 60;
-    const timeLabel = hrs > 0 ? `${hrs} h ${mins} mins` : `${mins} mins`;
-
-    document.getElementById('metricsRow').innerHTML = [
-      {label: 'TOTAL DISTANCE', val: d.total_distance + ' km'},
-      {label: 'ESTIMATED TIME', val: timeLabel},
-      {label: 'TOTAL STOPS', val: d.total_stops},
-      {label: 'ALGORITHM', val: d.algorithm},
-      {label: 'DATE', val: d.date}
-    ].map(c => `
-      <div class="res-card">
-        <div class="res-card-label">${c.label}</div>
-        <div class="res-card-val">${c.val}</div>
-      </div>`).join('');
-
-    // Visit order
-    document.getElementById('route-list').innerHTML = d.route.map((x, i) => {
-      let label = x.customer_name || '';
-      if (x.is_depot_start) label += ' (Start)';
-      if (x.is_depot_end) label = 'Return to Start';
-      const sub = (!x.is_depot_start && !x.is_depot_end && x.address) ? `<span>${x.address}</span>` : '';
-      return `
-        <div class="opt-loc-row">
-          <span class="opt-loc-num">${i+1}</span>
-          <span class="opt-loc-txt"><b>${label}</b>${sub}</span>
-          ${!x.is_depot_start && !x.is_depot_end 
-            ? `<button type="button" class="x-remove" onclick="removeStop('${x.id}');computeRoute()">✕</button>` 
-            : '<span style="width:20px"></span>'}
-        </div>`;
-    }).join('');
-
-    // === DRAW THE RESULT MAP (important part) ===
-    setTimeout(() => {
-      initLeafletMap2();
-
-      // Give Leaflet more time to initialize properly
-      setTimeout(() => {
-        if (lmap2) {
-          lmap2.invalidateSize(true);
-          drawLeafletRouteResult(d.route);
-        }
-      }, 350);   // ← increased delay
-    }, 100);
-
-  } catch (x) {
-    err.textContent = x.message;
-    err.style.display = 'block';
-  }
-}
-document.getElementById('go').onclick = computeRoute;
-
-/* ---------------- AFTER optimization map ---------------- */
-function drawLeafletRouteResult(route){
-  if (!lmap2 || !lMarkers2 || !lLines2) {
-    console.warn('Map2 not ready yet');
-    return;
-  }
+/* ---------- Draw after optimization ---------- */
+function drawResultMap(route) {
+  if (!lmap2) return;
 
   lMarkers2.clearLayers();
   lLines2.clearLayers();
 
-  const latlngs = [];
+  const points = [];
 
   route.forEach((x, i) => {
     const lat = parseFloat(x.latitude);
     const lng = parseFloat(x.longitude);
     if (isNaN(lat) || isNaN(lng)) return;
 
-    latlngs.push([lat, lng]);
+    points.push([lat, lng]);
 
     if (x.is_depot_start) {
-      L.marker([lat, lng], {
-        icon: pinIconLeaflet(1),
-        zIndexOffset: 9999
-      }).bindPopup('<b>1. Start</b><br>' + (x.customer_name || '')).addTo(lMarkers2);
-    } 
-    else if (!x.is_depot_end) {
-      L.marker([lat, lng], {
-        icon: pinIconLeaflet(i + 1),
-        zIndexOffset: 9000 + i
-      }).bindPopup(`<b>${i+1}. ${x.customer_name}</b><br>${x.address || ''}`).addTo(lMarkers2);
+      L.marker([lat, lng], { icon: pinIcon(1), zIndexOffset: 9999 })
+        .bindPopup(`<b>1. Start</b><br>${x.customer_name || ''}`)
+        .addTo(lMarkers2);
+    } else if (!x.is_depot_end) {
+      L.marker([lat, lng], { icon: pinIcon(i + 1) })
+        .bindPopup(`<b>${i + 1}. ${x.customer_name}</b><br>${x.address || ''}`)
+        .addTo(lMarkers2);
     }
   });
 
-  // Draw thick blue route line
-  if (latlngs.length >= 2) {
-    L.polyline(latlngs, {
-      color: '#ffffff',
-      weight: 16,
-      opacity: 1,
-      lineJoin: 'round',
-      interactive: false
-    }).addTo(lLines2);
-
-    L.polyline(latlngs, {
-      color: '#1629ff',
-      weight: 10,
-      opacity: 1,
-      lineJoin: 'round',
-      interactive: false
-    }).addTo(lLines2);
+  if (points.length >= 2) {
+    L.polyline(points, { color: '#ffffff', weight: 16, opacity: 1 }).addTo(lLines2);
+    L.polyline(points, { color: '#1629ff', weight: 10, opacity: 1 }).addTo(lLines2);
   }
 
-  // Fit bounds
   setTimeout(() => {
-    try {
-      lmap2.invalidateSize(true);
-      if (latlngs.length > 0) {
-        lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.35));
-      }
-    } catch(e) {
-      console.warn('fitBounds error', e);
+    lmap2.invalidateSize();
+    if (points.length) {
+      lmap2.fitBounds(points, { padding: [50, 50] });
     }
   }, 200);
 }
 
-/* ---------------- Print / Download ---------------- */
-document.getElementById('printBtn').onclick = () => window.print();
+/* ---------- Main Logic ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize first map
+  initMap1();
+  renderStopList();
 
-document.getElementById('downloadBtn').onclick = () => {
-  if (!lastRoute) return;
-  let csv = 'Stop,Location,Address,Latitude,Longitude\n';
-  lastRoute.route.forEach((r, i) => {
-    let name = r.customer_name || '';
-    if (r.is_depot_end) name = 'Return to Start';
-    csv += `${i+1},"${name}","${r.address || ''}",${r.latitude},${r.longitude}\n`;
+  // Add stop button
+  document.getElementById('addStopBtn').addEventListener('click', () => {
+    const sel = document.getElementById('addSelect');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+
+    const id = opt.value;
+    if (selectedStops.find(s => s.id === id)) return;
+
+    selectedStops.push({
+      id: id,
+      name: opt.dataset.name,
+      addr: opt.dataset.addr,
+      lat: parseFloat(opt.dataset.lat),
+      lng: parseFloat(opt.dataset.lng)
+    });
+
+    sel.value = '';
+    renderStopList();
+    redrawMapStops();
   });
-  csv += `\nTotal Distance,${lastRoute.total_distance} km\n`;
-  csv += `Algorithm,${lastRoute.algorithm}\n`;
-  csv += `Stops,${lastRoute.total_stops}\n`;
 
-  const blob = new Blob([csv], {type: 'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'optimized_route.csv';
-  a.click();
-};
+  // Optimize button
+  document.getElementById('go').addEventListener('click', async () => {
+    const err = document.getElementById('err');
+    err.style.display = 'none';
+
+    if (selectedStops.length < 2) {
+      err.textContent = 'Please add at least 2 delivery locations';
+      err.style.display = 'block';
+      return;
+    }
+
+    try {
+      const res = await fetch('{{ url_for("api_optimize") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          delivery_ids: selectedStops.map(s => s.id),
+          algorithm: document.getElementById('algorithm').value
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Optimization failed');
+
+      lastRoute = data;
+
+      // Show result view
+      document.getElementById('beforeView').style.display = 'none';
+      document.getElementById('afterView').style.display = 'block';
+
+      // Metrics
+      const mins = data.estimated_minutes;
+      const timeLabel = mins >= 60
+        ? `${Math.floor(mins/60)} h ${mins%60} mins`
+        : `${mins} mins`;
+
+      document.getElementById('metricsRow').innerHTML = `
+        <div class="res-card"><div class="res-card-label">TOTAL DISTANCE</div><div class="res-card-val">${data.total_distance} km</div></div>
+        <div class="res-card"><div class="res-card-label">ESTIMATED TIME</div><div class="res-card-val">${timeLabel}</div></div>
+        <div class="res-card"><div class="res-card-label">TOTAL STOPS</div><div class="res-card-val">${data.total_stops}</div></div>
+        <div class="res-card"><div class="res-card-label">ALGORITHM</div><div class="res-card-val">${data.algorithm}</div></div>
+        <div class="res-card"><div class="res-card-label">DATE</div><div class="res-card-val">${data.date}</div></div>
+      `;
+
+      // Visit order
+      document.getElementById('route-list').innerHTML = data.route.map((x, i) => {
+        let name = x.customer_name || '';
+        if (x.is_depot_start) name += ' (Start)';
+        if (x.is_depot_end) name = 'Return to Start';
+        return `
+          <div class="opt-loc-row">
+            <span class="opt-loc-num">${i + 1}</span>
+            <span class="opt-loc-txt"><b>${name}</b>${x.address && !x.is_depot_end ? `<span>${x.address}</span>` : ''}</span>
+          </div>`;
+      }).join('');
+
+      // Initialize result map
+      setTimeout(() => {
+        initMap2();
+        setTimeout(() => {
+          drawResultMap(data.route);
+        }, 300);
+      }, 100);
+
+    } catch (e) {
+      err.textContent = e.message;
+      err.style.display = 'block';
+    }
+  });
+
+  // Print & Download
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    if (!lastRoute) return;
+    let csv = 'Stop,Location,Address,Latitude,Longitude\n';
+    lastRoute.route.forEach((r, i) => {
+      let name = r.is_depot_end ? 'Return to Start' : (r.customer_name || '');
+      csv += `${i+1},"${name}","${r.address||''}",${r.latitude},${r.longitude}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'optimized_route.csv';
+    a.click();
+  });
+});
 </script>
 {% endblock %}

@@ -388,30 +388,65 @@ def api_optimize():
     except ValueError as e:
         return jsonify(error=str(e)), 400
     ms = (time.perf_counter() - t) * 1000
-    route = [{
-        'id': rows[i]['id'],
-        'customer_name': rows[i]['customer_name'],
-        'address': rows[i]['address'],
-        'latitude': rows[i]['latitude'],
-        'longitude': rows[i]['longitude']
-    } for i in o]
+
+    route_inner = []
+    for idx, i in enumerate(o):
+        if i == 0 and idx == 0:
+            route_inner.append({
+                'id': 'depot',
+                'customer_name': DEPOT_NAME,
+                'address': 'Pickup / Start',
+                'latitude': DEPOT_COORDS[0],
+                'longitude': DEPOT_COORDS[1],
+                'is_depot_start': True
+            })
+        elif i == 0 and idx == len(o) - 1:
+            route_inner.append({
+                'id': 'depot_end',
+                'customer_name': DEPOT_NAME,
+                'address': 'Return to Start',
+                'latitude': DEPOT_COORDS[0],
+                'longitude': DEPOT_COORDS[1],
+                'is_depot_end': True
+            })
+        else:
+            route_inner.append({
+                'id': rows[i]['id'],
+                'customer_name': rows[i]['customer_name'],
+                'address': rows[i]['address'],
+                'latitude': rows[i]['latitude'],
+                'longitude': rows[i]['longitude']
+            })
+
     saved = bd - d
     imp = saved / bd * 100 if bd else 0
+    algo_label = used
+    if 'Exact' in algo_label:
+        algo_label = 'Exact TSP (Brute-Force)'
+    elif 'Nearest' in algo_label:
+        algo_label = 'TSP (NN + 2-Opt)'
+
     db().execute(
         'INSERT INTO route_history(algorithm,stop_count,total_distance,execution_ms,route_json,created_at) VALUES(?,?,?,?,?,?)',
-        (used, len(points), d, ms, json.dumps(route), datetime.now().isoformat(timespec='seconds'))
+        (used, len(points), d, ms, json.dumps(route_inner), datetime.now().isoformat(timespec='seconds'))
     )
     db().commit()
     est_minutes = round(d / AVG_SPEED_KMH * 60)
+    date_label = datetime.now().strftime('%b %-d, %Y')
     return jsonify(
-        route=route,
-        algorithm=used,
-        total_distance=round(d, 3),
+        route=route_inner,
+        algorithm=algo_label,
+        total_distance=round(d, 2),
         before_distance=round(bd, 3),
         distance_saved=round(saved, 3),
         improvement=round(imp, 2),
         execution_ms=round(ms, 3),
-        estimated_minutes=est_minutes
+        estimated_minutes=est_minutes,
+        total_stops=len(points),
+        date=date_label,
+        depot_name=DEPOT_NAME,
+        depot_latitude=DEPOT_COORDS[0],
+        depot_longitude=DEPOT_COORDS[1]
     )
 
 @app.route('/history')

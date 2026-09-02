@@ -11,103 +11,195 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-split">
-  <div class="card card-pad">
 
-    <label class="f-label">Pickup Location</label>
-    <input class="f-input" value="{{ depot_name }}" readonly style="margin-bottom:16px;background:var(--bg)">
-
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <label class="f-label" style="margin:0">Delivery Locations</label>
-      <select id="algorithm" class="f-input" style="width:auto;padding:5px 8px;font-size:12px">
-        <option value="auto">Automatic</option>
-        <option value="exact">Exact TSP</option>
-        <option value="nearest">Nearest Neighbour</option>
-      </select>
-    </div>
-
-    <div id="stopList" style="margin-top:4px"></div>
-
-    <div class="add-location-row">
-      <select id="addSelect" class="f-input">
-        <option value="">Select a delivery to add…</option>
-        {% for d in deliveries %}
-        <option value="{{d.id}}" data-lat="{{d.latitude}}" data-lng="{{d.longitude}}" data-name="{{d.customer_name|e}}" data-addr="{{d.address|e}}">{{d.customer_name}} — {{d.address}}</option>
-        {% endfor %}
-      </select>
-      <button type="button" id="addStopBtn" class="btn btn-outline btn-sm">{{ic.icon('plus')}} Add Location</button>
-    </div>
-
-    <button id="go" class="btn btn-primary btn-block" style="margin-top:18px">Optimize Route</button>
-    <div id="err" class="flash flash-danger" style="display:none;margin-top:12px"></div>
+<div id="beforeView">
+  <div class="welcome-header" style="margin-bottom:22px">
+    <h1 class="welcome-title">Optimize Delivery Route</h1>
+    <p class="welcome-sub">Enter pickup location and delivery points</p>
   </div>
 
-  <div class="map-col">
-    <div id="map"></div>
-    <div class="map-toggle" id="mapToggle" style="display:none">
-      <button type="button" data-mode="map" class="active">Map</button>
-      <button type="button" data-mode="satellite">Satellite</button>
+  <div class="grid grid-split">
+    <div class="card card-pad" style="padding:24px">
+
+      <div class="opt-field-wrap">
+        <label class="opt-field-label">Pickup Location</label>
+        <input class="opt-depot-input" value="{{ depot_name }}" readonly>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:22px 0 10px">
+        <label class="opt-field-label" style="margin:0">Delivery Locations</label>
+        <select id="algorithm" class="opt-algo-select">
+          <option value="auto">Auto Algorithm</option>
+          <option value="exact">Exact TSP</option>
+          <option value="nearest">Nearest Neighbour</option>
+        </select>
+      </div>
+
+      <div id="stopList" style="margin-top:4px"></div>
+
+      <div class="add-location-row" style="margin-top:8px">
+        <select id="addSelect" class="opt-add-select">
+          <option value="">Select a delivery to add…</option>
+          {% for d in deliveries %}
+          <option value="{{d.id}}" data-lat="{{d.latitude}}" data-lng="{{d.longitude}}" data-name="{{d.customer_name|e}}" data-addr="{{d.address|e}}">{{d.customer_name}} — {{d.address}}</option>
+          {% endfor %}
+        </select>
+        <button type="button" id="addStopBtn" class="opt-add-btn">{{ic.icon('plus')}} Add Location</button>
+      </div>
+
+      <button id="go" class="btn-optimize-primary">Optimize Route</button>
+      <div id="err" class="flash flash-danger" style="display:none;margin-top:12px"></div>
+    </div>
+
+    <div class="map-col">
+      <div class="map-wrap">
+        <div class="map-toggle" id="mapToggle">
+          <button type="button" data-mode="map" class="active">Map</button>
+          <button type="button" data-mode="satellite">Satellite</button>
+        </div>
+        <div id="map"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="results" class="card card-pad" style="margin-top:16px;display:none">
-  <div class="section-title"><div><h2>Optimization Result</h2></div></div>
-  <div id="metrics" class="grid grid-4"></div>
-
-  <div style="margin-top:18px">
-    <label class="f-label">Optimized Visit Order</label>
-    <div id="route-list" style="margin-top:8px"></div>
+<div id="afterView" style="display:none">
+  <div class="welcome-header" style="margin-bottom:22px">
+    <h1 class="welcome-title">Optimization Result</h1>
   </div>
 
-  <div style="display:flex;gap:10px;margin-top:16px">
-    <button type="button" id="printBtn" class="btn btn-outline">Print</button>
-    <button type="button" id="downloadBtn" class="btn btn-success">Download Route</button>
+  <div id="metricsRow" class="grid metrics-grid" style="margin-bottom:24px"></div>
+
+  <div class="grid grid-split">
+    <div class="card card-pad" style="padding:24px">
+      <label class="opt-field-label" style="margin-bottom:12px;display:block">Optimized Visit Order</label>
+      <div id="route-list"></div>
+
+      <div style="display:flex;gap:12px;margin-top:24px">
+        <button type="button" id="printBtn" class="btn-print">{{ic.icon('reports')}} Print</button>
+        <button type="button" id="downloadBtn" class="btn-download">{{ic.icon('optimize')}} Download Route</button>
+      </div>
+    </div>
+
+    <div class="map-col">
+      <div class="map-wrap">
+        <div class="map-toggle" id="mapToggle2">
+          <button type="button" data-mode="map" class="active">Map</button>
+          <button type="button" data-mode="satellite">Satellite</button>
+        </div>
+        <div id="map2"></div>
+      </div>
+    </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 const HAS_GOOGLE = {{ 'true' if google_maps_api_key and google_maps_api_key!='YOUR_GOOGLE_MAPS_API_KEY' else 'false' }};
 const DEPOT = {lat:4.8156, lng:7.0498, name:{{depot_name|tojson}}};
-let gmap, dirService, dirRenderer, lmap, lLayer, lSatellite, lStreets;
-let usingGoogle = false, mapReady = false;
-let selectedStops = [];      // {id,name,addr,lat,lng}
-let lastRoute = null;        // last computed route response
+let gmap, dirService, dirRenderer, gmap2;
+let lmap, lSatellite, lStreets, lMarkers;
+let lmap2, lSatellite2, lStreets2, lMarkers2;
+let usingGoogle = false, mapReady = false, map2Ready = false;
+let selectedStops = [];
+let lastRoute = null;
+
+/* ------------- Numbered pin SVG for Leaflet ------------- */
+function pinIcon(number, color){
+  color = color || '#e0405a';
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
+    <defs>
+      <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.2"/>
+      </filter>
+    </defs>
+    <path filter="url(#s)" fill="${color}" stroke="#fff" stroke-width="2.5"
+      d="M18 2c8.3 0 15 6.7 15 15 0 11.2-15 27-15 27S3 28.2 3 17C3 8.7 9.7 2 18 2z"/>
+    <circle cx="18" cy="17" r="10" fill="#fff"/>
+    <text x="18" y="21" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="13" font-weight="800" fill="${color}">${number}</text>
+  </svg>`;
+  return L.divIcon({
+    className:'custom-pin',
+    html:svg,
+    iconSize:[36,46],
+    iconAnchor:[18,44],
+    popupAnchor:[0,-42]
+  });
+}
+function depotPin(){
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
+    <defs><filter id="s2" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.2"/>
+    </filter></defs>
+    <path filter="url(#s2)" fill="#3647c9" stroke="#fff" stroke-width="2.5"
+      d="M18 2c8.3 0 15 6.7 15 15 0 11.2-15 27-15 27S3 28.2 3 17C3 8.7 9.7 2 18 2z"/>
+    <circle cx="18" cy="17" r="10" fill="#fff"/>
+    <text x="18" y="21" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="12" font-weight="900" fill="#3647c9">D</text>
+  </svg>`;
+  return L.divIcon({
+    className:'custom-pin',
+    html:svg,
+    iconSize:[36,46],
+    iconAnchor:[18,44],
+    popupAnchor:[0,-42]
+  });
+}
 
 /* ---------------- Map init ---------------- */
 function initGoogleMap(){
   try{
     gmap = new google.maps.Map(document.getElementById('map'), {
-      center:DEPOT, zoom:12, mapTypeControl:true,
-      mapTypeControlOptions:{position: google.maps.ControlPosition.TOP_LEFT}
+      center:DEPOT, zoom:12, disableDefaultUI:true, zoomControl:true, fullscreenControl:true
     });
     dirService = new google.maps.DirectionsService();
     dirRenderer = new google.maps.DirectionsRenderer({map:gmap, suppressMarkers:false});
     usingGoogle = true; mapReady = true;
-  }catch(e){ console.warn('Google Maps failed to init, falling back:', e); fallbackToLeaflet(); }
+    redrawMapStops();
+  }catch(e){ console.warn('Google Maps failed:', e); fallbackToLeaflet(); }
 }
 function initLeafletMap(){
   if(typeof L === 'undefined'){ mapFailed(); return; }
   try{
     lmap = L.map('map', {zoomControl:true}).setView([DEPOT.lat, DEPOT.lng], 12);
-    lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors', maxZoom:19}).addTo(lmap);
+    lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap', maxZoom:19}).addTo(lmap);
     lSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'Tiles &copy; Esri', maxZoom:19});
-    lLayer = L.layerGroup().addTo(lmap);
+    lMarkers = L.layerGroup().addTo(lmap);
     usingGoogle = false; mapReady = true;
-    document.getElementById('mapToggle').style.display = 'flex';
+    setupToggle('mapToggle', lmap, lStreets, lSatellite);
     setTimeout(()=>lmap.invalidateSize(), 200);
-    window.addEventListener('resize', ()=>lmap && lmap.invalidateSize());
-  }catch(e){ console.warn('Leaflet failed to init:', e); mapFailed(); }
+    window.addEventListener('resize', ()=>{ if(lmap) lmap.invalidateSize(); if(lmap2) lmap2.invalidateSize(); });
+    redrawMapStops();
+  }catch(e){ console.warn('Leaflet failed:', e); mapFailed(); }
 }
-document.getElementById('mapToggle').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button'); if(!btn || !lmap) return;
-  document.querySelectorAll('.map-toggle button').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  if(btn.dataset.mode === 'satellite'){ lmap.removeLayer(lStreets); lSatellite.addTo(lmap); }
-  else { lmap.removeLayer(lSatellite); lStreets.addTo(lmap); }
-});
+function initLeafletMap2(){
+  if(typeof L === 'undefined') return;
+  try{
+    lmap2 = L.map('map2', {zoomControl:true}).setView([DEPOT.lat, DEPOT.lng], 12);
+    lStreets2 = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap', maxZoom:19}).addTo(lmap2);
+    lSatellite2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'Tiles &copy; Esri', maxZoom:19});
+    lMarkers2 = L.layerGroup().addTo(lmap2);
+    map2Ready = true;
+    setupToggle('mapToggle2', lmap2, lStreets2, lSatellite2);
+    setTimeout(()=>lmap2.invalidateSize(), 200);
+  }catch(e){ console.warn('Leaflet map2 failed:', e); }
+}
+function setupToggle(id, map, streets, sat){
+  const bar = document.getElementById(id);
+  if(!bar) return;
+  bar.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    bar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    try{
+      if(btn.dataset.mode === 'satellite'){ map.removeLayer(streets); sat.addTo(map); }
+      else { map.removeLayer(sat); streets.addTo(map); }
+    }catch(_){}
+  });
+}
 function fallbackToLeaflet(){
   if(typeof L !== 'undefined'){ initLeafletMap(); return; }
   const css = document.createElement('link'); css.rel='stylesheet'; css.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
@@ -133,55 +225,76 @@ document.getElementById('addStopBtn').onclick = () => {
   if(!opt || !opt.value) return;
   const id = opt.value;
   if(selectedStops.find(s=>s.id===id)) return;
-  selectedStops.push({id, name:opt.dataset.name, addr:opt.dataset.addr, lat:opt.dataset.lat, lng:opt.dataset.lng});
+  selectedStops.push({id, name:opt.dataset.name, addr:opt.dataset.addr, lat:parseFloat(opt.dataset.lat), lng:parseFloat(opt.dataset.lng)});
   sel.value = '';
   renderStopList();
+  redrawMapStops();
 };
 function removeStop(id){
   selectedStops = selectedStops.filter(s=>s.id!==id);
   renderStopList();
+  redrawMapStops();
 }
 function renderStopList(){
   const el = document.getElementById('stopList');
   if(selectedStops.length===0){
-    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:6px 0">No stops added yet — pick a delivery below and click "Add Location".</p>';
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:6px 0 4px;text-align:center;padding:22px 8px;border:1px dashed var(--border-strong);border-radius:10px;background:var(--bg)">No stops added yet.<br>Select a delivery below and click "Add Location".</p>';
     return;
   }
   el.innerHTML = selectedStops.map((s,i)=>`
-    <div class="stop-row">
-      <span class="n">${i+1}</span>
-      <span class="txt"><b>${s.name}</b><span>${s.addr}</span></span>
+    <div class="opt-loc-row">
+      <span class="opt-loc-num">${i+1}</span>
+      <span class="opt-loc-txt"><b>${s.name}</b><span>${s.addr}</span></span>
       <button type="button" class="x-remove" onclick="removeStop('${s.id}')">✕</button>
     </div>`).join('');
 }
 
-/* ---------------- Route drawing ---------------- */
-function drawGoogleRoute(route){
-  if(route.length < 2 || !dirService) return;
-  const wp = route.slice(1,-1).map(x=>({location:{lat:x.latitude,lng:x.longitude}, stopover:true}));
-  dirService.route({
-    origin:{lat:route[0].latitude,lng:route[0].longitude},
-    destination:{lat:route[route.length-1].latitude,lng:route[route.length-1].longitude},
-    waypoints:wp, travelMode:google.maps.TravelMode.DRIVING
-  }, (res,status)=>{ if(status==='OK') dirRenderer.setDirections(res); });
-}
-function drawLeafletRoute(route){
-  if(!lmap || !lLayer) return;
-  lLayer.clearLayers();
-  const latlngs = route.map(r=>[r.latitude, r.longitude]);
-  L.polyline(latlngs, {color:'#3647c9', weight:4, opacity:.85}).addTo(lLayer);
-  route.forEach((r,i)=>{
-    const isEdge = (i===0 || i===route.length-1);
-    L.circleMarker([r.latitude, r.longitude], {
-      radius: isEdge?8:6, color:'#fff', weight:2,
-      fillColor: isEdge?'#e0405a':'#3647c9', fillOpacity:1
-    }).bindPopup((i===route.length-1?'Return to Depot':(i+1)+'. '+r.customer_name)).addTo(lLayer);
-  });
-  if(latlngs.length) lmap.fitBounds(latlngs, {padding:[30,30]});
-}
-function drawRoute(route){
-  try{ if(usingGoogle) drawGoogleRoute(route); else drawLeafletRoute(route); }
-  catch(e){ console.warn('Map draw failed (results are still valid):', e); }
+/* ---------------- Live draw BEFORE optimization ---------------- */
+function redrawMapStops(){
+  if(!mapReady) return;
+  if(usingGoogle){
+    // Google: place markers and polyline
+    if(window._gMarkers) window._gMarkers.forEach(m=>m.setMap(null));
+    if(window._gLine) window._gLine.setMap(null);
+    const markers = [];
+    const path = [{lat:DEPOT.lat,lng:DEPOT.lng}];
+    const labelColors = ['#e0405a','#3647c9','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
+    const depotMarker = new google.maps.Marker({
+      position:DEPOT, map:gmap, label:{text:'D', color:'#3647c9', fontWeight:'800', fontSize:'12px'},
+      title:DEPOT.name
+    });
+    markers.push(depotMarker);
+    selectedStops.forEach((s,i)=>{
+      const c = labelColors[i % labelColors.length];
+      const m = new google.maps.Marker({
+        position:{lat:s.lat,lng:s.lng}, map:gmap,
+        label:{text:String(i+1), color:c, fontWeight:'800', fontSize:'12px'},
+        title: `${i+1}. ${s.name}`
+      });
+      markers.push(m);
+      path.push({lat:s.lat,lng:s.lng});
+    });
+    path.push({lat:DEPOT.lat,lng:DEPOT.lng});
+    window._gLine = new google.maps.Polyline({path, strokeColor:'#3647c9', strokeWeight:3, strokeOpacity:0.75, map:gmap});
+    window._gMarkers = markers;
+  } else if(lmap){
+    lMarkers.clearLayers();
+    const latlngs = [[DEPOT.lat, DEPOT.lng]];
+    L.marker([DEPOT.lat, DEPOT.lng], {icon:depotPin()}).bindPopup('<b>Start</b><br>'+DEPOT.name).addTo(lMarkers);
+    const palette = ['#e0405a','#3647c9','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
+    selectedStops.forEach((s,i)=>{
+      const c = palette[i % palette.length];
+      L.marker([s.lat, s.lng], {icon:pinIcon(i+1, c)}).bindPopup(`<b>${i+1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
+      latlngs.push([s.lat, s.lng]);
+    });
+    if(selectedStops.length > 0){
+      latlngs.push([DEPOT.lat, DEPOT.lng]);
+      L.polyline(latlngs, {color:'#3647c9', weight:3.5, opacity:0.75, dashArray:'8 5'}).addTo(lMarkers);
+    }
+    if(latlngs.length > 2){
+      try{ lmap.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }catch(_){}
+    }
+  }
 }
 
 /* ---------------- Optimize call ---------------- */
@@ -201,30 +314,117 @@ async function computeRoute(){
     if(!r.ok) throw new Error(d.error);
     lastRoute = d;
 
-    document.getElementById('results').style.display='block';
-    const hrs = Math.floor(d.estimated_minutes/60), mins = d.estimated_minutes%60;
-    const timeLabel = hrs>0 ? `${hrs}h ${mins}min` : `${mins} min`;
-    const dateLabel = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-    const m = [
-      ['Total Distance', d.total_distance+' km'],
-      ['Estimated Time', timeLabel],
-      ['Total Stops', d.route.length-1],
-      ['Algorithm', d.algorithm],
-      ['Date', dateLabel]
-    ];
-    document.getElementById('metrics').innerHTML = m.map(x=>
-      `<div class="metric-box"><small>${x[0]}</small><strong style="${x[0]==='Algorithm'?'color:var(--primary)':''}">${x[1]}</strong></div>`
-    ).join('');
-    document.getElementById('route-list').innerHTML = d.route.map((x,i)=>
-      `<li><span class="n">${i+1}</span>${(i===d.route.length-1)?'Return to Start':x.customer_name+' — '+x.address}${i>0 && i<d.route.length-1 ? `<button type="button" class="x-remove" onclick="removeStop('${x.id}');computeRoute()">✕</button>`:''}</li>`
-    ).join('');
+    document.getElementById('beforeView').style.display = 'none';
+    document.getElementById('afterView').style.display = 'block';
 
-    drawRoute(d.route);
+    const hrs = Math.floor(d.estimated_minutes/60), mins = d.estimated_minutes%60;
+    const timeLabel = hrs>0 ? `${hrs} h ${mins} mins` : `${mins} mins`;
+
+    const cards = [
+      {label:'Total Distance', val: d.total_distance+' km', cls:'res-card-blue'},
+      {label:'Estimated Time', val: timeLabel, cls:''},
+      {label:'Total Stops', val: d.total_stops, cls:''},
+      {label:'Algorithm', val: d.algorithm, cls:'res-card-blue'},
+      {label:'Date', val: d.date, cls:''}
+    ];
+    document.getElementById('metricsRow').innerHTML = cards.map(c=>`
+      <div class="res-card ${c.cls}">
+        <div class="res-card-label">${c.label}</div>
+        <div class="res-card-val">${c.val}</div>
+      </div>`).join('');
+
+    document.getElementById('route-list').innerHTML = d.route.map((x,i)=>{
+      let label, sub;
+      if(x.is_depot_start){ label = x.customer_name + ' (Start)'; sub = ''; }
+      else if(x.is_depot_end){ label = 'Return to Start'; sub = ''; }
+      else { label = x.customer_name; sub = x.address ? x.address : ''; }
+      return `
+      <div class="opt-loc-row">
+        <span class="opt-loc-num">${i+1}</span>
+        <span class="opt-loc-txt"><b>${label}</b>${sub?`<span>${sub}</span>`:''}</span>
+        ${ !x.is_depot_start && !x.is_depot_end ? `<button type="button" class="x-remove" onclick="removeStop('${x.id}');computeRoute()">✕</button>` : '<span style="width:20px"></span>' }
+      </div>`;
+    }).join('');
+
+    // Init 2nd map and draw result
+    setTimeout(()=>{
+      if(usingGoogle){
+        gmap2 = new google.maps.Map(document.getElementById('map2'), {
+          center:DEPOT, zoom:12, disableDefaultUI:true, zoomControl:true, fullscreenControl:true
+        });
+        drawGoogleRouteResult(d.route, gmap2);
+      } else {
+        initLeafletMap2();
+        drawLeafletRouteResult(d.route);
+      }
+    }, 50);
   }catch(x){
     err.textContent = x.message; err.style.display='block';
   }
 }
 document.getElementById('go').onclick = computeRoute;
+
+/* ---------------- After-optimization drawing ---------------- */
+function drawGoogleRouteResult(route, map){
+  if(route.length < 2 || !window.google || !map) return;
+  const labelColors = ['#3647c9','#e0405a','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
+  route.forEach((x,i)=>{
+    if(x.is_depot_start){
+      new google.maps.Marker({position:{lat:x.latitude,lng:x.longitude}, map, label:{text:'1', color:'#3647c9', fontWeight:'800'}, title: '1. Start'});
+    } else if(x.is_depot_end){
+      // skip duplicate depot pin (start already there)
+    } else {
+      const idx = i;
+      const c = labelColors[idx % labelColors.length];
+      new google.maps.Marker({position:{lat:x.latitude,lng:x.longitude}, map,
+        label:{text:String(i+1), color:c, fontWeight:'800'},
+        title: `${i+1}. ${x.customer_name}`});
+    }
+  });
+  // Use Directions if possible
+  if(dirService){
+    const origin = {lat:route[0].latitude, lng:route[0].longitude};
+    const destination = {lat:route[route.length-1].latitude, lng:route[route.length-1].longitude};
+    const wp = route.slice(1,-1).map(x=>({location:{lat:x.latitude,lng:x.longitude}, stopover:true}));
+    try{
+      dirService.route({origin, destination, waypoints:wp, travelMode:google.maps.TravelMode.DRIVING},
+        (res,status)=>{
+          if(status==='OK'){
+            new google.maps.DirectionsRenderer({map, directions:res, suppressMarkers:true,
+              polylineOptions:{strokeColor:'#3647c9', strokeWeight:4, strokeOpacity:0.9}});
+          } else {
+            const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
+            new google.maps.Polyline({path, strokeColor:'#3647c9', strokeWeight:4, strokeOpacity:0.9, map});
+          }
+        });
+    }catch(_){
+      const path = route.map(x=>({lat:x.latitude,lng:x.longitude}));
+      new google.maps.Polyline({path, strokeColor:'#3647c9', strokeWeight:4, strokeOpacity:0.9, map});
+    }
+  }
+}
+function drawLeafletRouteResult(route){
+  if(!lmap2 || !lMarkers2) return;
+  setTimeout(()=>lmap2.invalidateSize(), 150);
+  lMarkers2.clearLayers();
+  const palette = ['#3647c9','#e0405a','#16a34a','#d9822b','#7c3aed','#0891b2','#be185d','#0f766e'];
+  const latlngs = [];
+  route.forEach((x,i)=>{
+    latlngs.push([x.latitude, x.longitude]);
+    if(x.is_depot_start){
+      L.marker([x.latitude, x.longitude], {icon:pinIcon(1, palette[0])}).bindPopup('<b>1. Start</b><br>'+x.customer_name).addTo(lMarkers2);
+    } else if(x.is_depot_end){
+      // skip
+    } else {
+      const c = palette[i % palette.length];
+      L.marker([x.latitude, x.longitude], {icon:pinIcon(i+1, c)}).bindPopup(`<b>${i+1}. ${x.customer_name}</b><br>${x.address||''}`).addTo(lMarkers2);
+    }
+  });
+  L.polyline(latlngs, {color:'#3647c9', weight:5, opacity:0.92}).addTo(lMarkers2);
+  if(latlngs.length){
+    try{ lmap2.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }catch(_){}
+  }
+}
 
 /* ---------------- Print / Download ---------------- */
 document.getElementById('printBtn').onclick = () => window.print();
@@ -232,11 +432,14 @@ document.getElementById('downloadBtn').onclick = () => {
   if(!lastRoute) return;
   let csv = 'Stop,Location,Address,Latitude,Longitude\n';
   lastRoute.route.forEach((r,i)=>{
-    const label = (i===lastRoute.route.length-1) ? 'Return to Start' : (i+1);
-    csv += `${label},"${r.customer_name}","${r.address}",${r.latitude},${r.longitude}\n`;
+    let label = String(i+1);
+    let name = r.customer_name || '';
+    if(r.is_depot_end){ name = 'Return to Start'; }
+    csv += `${label},"${name}","${r.address||''}",${r.latitude},${r.longitude}\n`;
   });
   csv += `\nTotal Distance,${lastRoute.total_distance} km\n`;
   csv += `Algorithm,${lastRoute.algorithm}\n`;
+  csv += `Stops,${lastRoute.total_stops}\n`;
   const blob = new Blob([csv], {type:'text/csv'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

@@ -57,7 +57,7 @@
           <button type="button" data-mode="map" class="active">Map</button>
           <button type="button" data-mode="satellite">Satellite</button>
         </div>
-        <div id="map" style="height:500px;"></div>
+        <div id="map"></div>
       </div>
     </div>
   </div>
@@ -87,7 +87,7 @@
           <button type="button" data-mode="map" class="active">Map</button>
           <button type="button" data-mode="satellite">Satellite</button>
         </div>
-        <div id="map2" style="height:500px;"></div>
+        <div id="map2"></div>
       </div>
     </div>
   </div>
@@ -135,7 +135,6 @@ function pinSvg(number) {
     </g>
   </svg>`;
 }
-
 function pinIcon(number) {
   return L.divIcon({
     className: 'custom-pin',
@@ -162,53 +161,64 @@ function setupToggle(id, map, streets, sat) {
       map.removeLayer(sat);
       streets.addTo(map);
     }
+    try { setTimeout(()=>{ map.invalidateSize(true); }, 60); }catch(_){}
   });
 }
 
 function initMap1() {
-  lmap = L.map('map').setView([DEPOT.lat, DEPOT.lng], 12);
+  if (lmap) { try { lmap.remove(); } catch(_){} lmap = null; }
+  lmap = L.map('map');
   lStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(lmap);
   lSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: '© Esri', maxZoom: 19
   });
-  lMarkers = L.layerGroup().addTo(lmap);
   lLines = L.layerGroup().addTo(lmap);
+  lMarkers = L.layerGroup().addTo(lmap);
   setupToggle('mapToggle', lmap, lStreets, lSatellite);
-  mapReady = true;
-  setTimeout(() => lmap.invalidateSize(), 200);
-  redrawMapStops();
+  lmap.setView([DEPOT.lat, DEPOT.lng], 12);
+
+  const redraw = () => {
+    try { lmap.invalidateSize(true); } catch(_){}
+    mapReady = true;
+    redrawMapStops();
+  };
+  lmap.whenReady(redraw);
+  lmap.on('load', redraw);
+  setTimeout(redraw, 120);
+  setTimeout(()=>{ try{lmap.invalidateSize(true);redrawMapStops();}catch(_){} }, 600);
 }
 
 function initMap2() {
-  if (lmap2) {
-    lmap2.remove();
-  }
-  lmap2 = L.map('map2').setView([DEPOT.lat, DEPOT.lng], 12);
+  if (lmap2) { try { lmap2.remove(); } catch(_){} lmap2 = null; }
+  lmap2 = L.map('map2');
   lStreets2 = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(lmap2);
   lSatellite2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: '© Esri', maxZoom: 19
   });
-  lMarkers2 = L.layerGroup().addTo(lmap2);
   lLines2 = L.layerGroup().addTo(lmap2);
+  lMarkers2 = L.layerGroup().addTo(lmap2);
   setupToggle('mapToggle2', lmap2, lStreets2, lSatellite2);
+  lmap2.setView([DEPOT.lat, DEPOT.lng], 12);
+
+  lmap2.whenReady(() => {
+    try { lmap2.invalidateSize(true); } catch(_){}
+  });
 }
 
 /* ---------- Stop List ---------- */
 function renderStopList() {
   const el = document.getElementById('stopList');
   if (!el) return;
-
   if (selectedStops.length === 0) {
     el.innerHTML = `<p style="color:#888;text-align:center;padding:20px;border:1px dashed #ccc;border-radius:8px;">
       No stops added yet.<br>Select a delivery and click "Add Location"
     </p>`;
     return;
   }
-
   el.innerHTML = selectedStops.map((s, i) => `
     <div class="opt-loc-row">
       <span class="opt-loc-num">${i + 1}</span>
@@ -217,7 +227,6 @@ function renderStopList() {
     </div>
   `).join('');
 }
-
 function removeStop(id) {
   selectedStops = selectedStops.filter(s => s.id !== id);
   renderStopList();
@@ -227,92 +236,87 @@ function removeStop(id) {
 /* ---------- Draw before optimization ---------- */
 function redrawMapStops() {
   if (!mapReady || !lmap) return;
-
-  lMarkers.clearLayers();
-  lLines.clearLayers();
+  try { lmap.invalidateSize(true); } catch(_){}
+  try { lMarkers.clearLayers(); } catch(_){}
+  try { lLines.clearLayers(); } catch(_){}
 
   const points = [[DEPOT.lat, DEPOT.lng]];
 
-  // Depot pin
   L.marker([DEPOT.lat, DEPOT.lng], {
-    icon: pinIcon(1),
-    zIndexOffset: 9999
+    icon: pinIcon(1), zIndexOffset: 9999
   }).bindPopup(`<b>Start</b><br>${DEPOT.name}`).addTo(lMarkers);
 
   selectedStops.forEach((s, i) => {
     L.marker([s.lat, s.lng], {
-      icon: pinIcon(i + 2)
+      icon: pinIcon(i + 2), zIndexOffset: 9500 + i
     }).bindPopup(`<b>${i + 1}. ${s.name}</b><br>${s.addr}`).addTo(lMarkers);
     points.push([s.lat, s.lng]);
   });
 
   if (selectedStops.length > 0) {
     points.push([DEPOT.lat, DEPOT.lng]);
-
-    L.polyline(points, { color: '#ffffff', weight: 15, opacity: 1 }).addTo(lLines);
-    L.polyline(points, { color: '#1629ff', weight: 9, opacity: 1 }).addTo(lLines);
+    const outer = L.polyline(points, { color: '#ffffff', weight: 17, opacity: 1, interactive: false, lineJoin: 'round', lineCap: 'round' }).addTo(lLines);
+    const inner = L.polyline(points, { color: '#1420e8', weight: 10, opacity: 1, interactive: false, lineJoin: 'round', lineCap: 'round' }).addTo(lLines);
+    try { outer.bringToBack(); inner.bringToFront(); } catch(_){}
   }
 
   if (points.length > 2) {
-    lmap.fitBounds(points, { padding: [40, 40] });
+    try {
+      const b = L.latLngBounds(points);
+      lmap.fitBounds(b.pad(0.28));
+    } catch(_){}
   }
 }
 
 /* ---------- Draw after optimization ---------- */
 function drawResultMap(route) {
   if (!lmap2) return;
-
-  lMarkers2.clearLayers();
-  lLines2.clearLayers();
+  try { lmap2.invalidateSize(true); } catch(_){}
+  try { lMarkers2.clearLayers(); } catch(_){}
+  try { lLines2.clearLayers(); } catch(_){}
 
   const points = [];
-
   route.forEach((x, i) => {
     const lat = parseFloat(x.latitude);
     const lng = parseFloat(x.longitude);
     if (isNaN(lat) || isNaN(lng)) return;
-
     points.push([lat, lng]);
-
     if (x.is_depot_start) {
       L.marker([lat, lng], { icon: pinIcon(1), zIndexOffset: 9999 })
         .bindPopup(`<b>1. Start</b><br>${x.customer_name || ''}`)
         .addTo(lMarkers2);
     } else if (!x.is_depot_end) {
-      L.marker([lat, lng], { icon: pinIcon(i + 1) })
+      L.marker([lat, lng], { icon: pinIcon(i + 1), zIndexOffset: 9500 + i })
         .bindPopup(`<b>${i + 1}. ${x.customer_name}</b><br>${x.address || ''}`)
         .addTo(lMarkers2);
     }
   });
 
   if (points.length >= 2) {
-    L.polyline(points, { color: '#ffffff', weight: 16, opacity: 1 }).addTo(lLines2);
-    L.polyline(points, { color: '#1629ff', weight: 10, opacity: 1 }).addTo(lLines2);
+    const outer = L.polyline(points, { color: '#ffffff', weight: 18, opacity: 1, interactive: false, lineJoin: 'round', lineCap: 'round' }).addTo(lLines2);
+    const inner = L.polyline(points, { color: '#1420e8', weight: 11, opacity: 1, interactive: false, lineJoin: 'round', lineCap: 'round' }).addTo(lLines2);
+    try { outer.bringToBack(); inner.bringToFront(); } catch(_){}
   }
 
-  setTimeout(() => {
-    lmap2.invalidateSize();
-    if (points.length) {
-      lmap2.fitBounds(points, { padding: [50, 50] });
-    }
-  }, 200);
+  if (points.length) {
+    try {
+      const b = L.latLngBounds(points);
+      lmap2.fitBounds(b.pad(0.3));
+    } catch(_){}
+  }
 }
 
 /* ---------- Main Logic ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  // Initialize first map
   initMap1();
   renderStopList();
 
-  // Add stop button
   document.getElementById('addStopBtn').addEventListener('click', () => {
     const sel = document.getElementById('addSelect');
     const opt = sel.options[sel.selectedIndex];
     if (!opt || !opt.value) return;
-
     const id = opt.value;
     if (selectedStops.find(s => s.id === id)) return;
-
     selectedStops.push({
       id: id,
       name: opt.dataset.name,
@@ -320,17 +324,14 @@ document.addEventListener('DOMContentLoaded', () => {
       lat: parseFloat(opt.dataset.lat),
       lng: parseFloat(opt.dataset.lng)
     });
-
     sel.value = '';
     renderStopList();
     redrawMapStops();
   });
 
-  // Optimize button
   document.getElementById('go').addEventListener('click', async () => {
     const err = document.getElementById('err');
     err.style.display = 'none';
-
     if (selectedStops.length < 2) {
       err.textContent = 'Please add at least 2 delivery locations';
       err.style.display = 'block';
@@ -352,25 +353,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
       lastRoute = data;
 
-      // Show result view
       document.getElementById('beforeView').style.display = 'none';
       document.getElementById('afterView').style.display = 'block';
 
-      // Metrics
       const mins = data.estimated_minutes;
       const timeLabel = mins >= 60
         ? `${Math.floor(mins/60)} h ${mins%60} mins`
         : `${mins} mins`;
 
+      // Apply "blue" class to Distance and Algorithm cards (per mockup)
       document.getElementById('metricsRow').innerHTML = `
-        <div class="res-card"><div class="res-card-label">TOTAL DISTANCE</div><div class="res-card-val">${data.total_distance} km</div></div>
+        <div class="res-card res-card-blue"><div class="res-card-label">TOTAL DISTANCE</div><div class="res-card-val">${data.total_distance} km</div></div>
         <div class="res-card"><div class="res-card-label">ESTIMATED TIME</div><div class="res-card-val">${timeLabel}</div></div>
         <div class="res-card"><div class="res-card-label">TOTAL STOPS</div><div class="res-card-val">${data.total_stops}</div></div>
-        <div class="res-card"><div class="res-card-label">ALGORITHM</div><div class="res-card-val">${data.algorithm}</div></div>
+        <div class="res-card res-card-blue"><div class="res-card-label">ALGORITHM</div><div class="res-card-val">${data.algorithm}</div></div>
         <div class="res-card"><div class="res-card-label">DATE</div><div class="res-card-val">${data.date}</div></div>
       `;
 
-      // Visit order
       document.getElementById('route-list').innerHTML = data.route.map((x, i) => {
         let name = x.customer_name || '';
         if (x.is_depot_start) name += ' (Start)';
@@ -382,13 +381,23 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>`;
       }).join('');
 
-      // Initialize result map
-      setTimeout(() => {
+      // Critical: after view is visible, force layout flush THEN init map2 THEN draw twice
+      requestAnimationFrame(() => {
+        try { window.dispatchEvent(new Event('resize')); } catch(_){}
         initMap2();
         setTimeout(() => {
+          try { lmap2.invalidateSize(true); } catch(_){}
           drawResultMap(data.route);
-        }, 300);
-      }, 100);
+          requestAnimationFrame(()=>{
+            try { lmap2.invalidateSize(true); } catch(_){}
+            drawResultMap(data.route);
+          });
+          setTimeout(()=>{
+            try { lmap2.invalidateSize(true); } catch(_){}
+            drawResultMap(data.route);
+          }, 800);
+        }, 250);
+      });
 
     } catch (e) {
       err.textContent = e.message;
@@ -396,16 +405,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Print & Download
   document.getElementById('printBtn').addEventListener('click', () => window.print());
-
   document.getElementById('downloadBtn').addEventListener('click', () => {
     if (!lastRoute) return;
     let csv = 'Stop,Location,Address,Latitude,Longitude\n';
     lastRoute.route.forEach((r, i) => {
-      let name = r.is_depot_end ? 'Return to Start' : (r.customer_name || '');
+      const name = r.is_depot_end ? 'Return to Start' : (r.customer_name || '');
       csv += `${i+1},"${name}","${r.address||''}",${r.latitude},${r.longitude}\n`;
     });
+    csv += `\nTotal Distance,${lastRoute.total_distance} km\n`;
+    csv += `Algorithm,${lastRoute.algorithm}\n`;
+    csv += `Stops,${lastRoute.total_stops}\n`;
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

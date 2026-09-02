@@ -187,7 +187,7 @@ PAGE_META = {
     'deliveries': ('Deliveries', 'Track and assign customer deliveries'),
     'optimize': ('Optimize Route', 'Select stops and compute the shortest route'),
     'history': ('Route History', 'Past route optimizations and results'),
-    'backend': ('System Architecture', 'How RouteOptima is built, layer by layer')
+  
 }
 
 @app.context_processor
@@ -407,10 +407,10 @@ def api_optimize():
 def history():
     return render_template('history.html', history=db().execute('SELECT * FROM route_history ORDER BY id DESC').fetchall())
 
-@app.route('/backend')
-@login_required
-def backend():
-    return render_template('backend.html')
+# @app.route('/backend')
+# @login_required
+# def backend():
+#     return render_template('backend.html')
 
 with app.app_context():
     init_db()

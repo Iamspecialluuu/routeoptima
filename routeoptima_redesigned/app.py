@@ -6,11 +6,10 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'dispatch_tsp.db')
-
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-this-secret-key')
 GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', 'YOUR_GOOGLE_MAPS_API_KEY')
-DEPOT_NAME = 'Choba, Port Harcourt Nigeria'
+DEPOT_NAME = 'Choba,_Port_Harcourt Nigeria'
 DEPOT_COORDS = (4.8156, 7.0498)
 AVG_SPEED_KMH = 25
 
@@ -86,12 +85,10 @@ def init_db():
         c.execute('ALTER TABLE riders ADD COLUMN vehicle TEXT')
     except sqlite3.OperationalError:
         pass
-
     now = datetime.now().isoformat(timespec='seconds')
     if c.execute('SELECT COUNT(*) FROM admins').fetchone()[0] == 0:
         c.execute('INSERT INTO admins(username,password_hash,created_at) VALUES(?,?,?)',
                   ('admin', hash_password('admin123'), now))
-
     if c.execute('SELECT COUNT(*) FROM riders').fetchone()[0] == 0:
         rows = [
             ('Chinedu Okafor', '08030000001', 'Honda CB125', 'Available', 4.8156, 7.0498),
@@ -101,7 +98,6 @@ def init_db():
         ]
         c.executemany('INSERT INTO riders(name,phone,vehicle,status,latitude,longitude,created_at) VALUES(?,?,?,?,?,?,?)',
                       [(a, b, v, d, e, f, now) for a, b, v, d, e, f in rows])
-
     if c.execute('SELECT COUNT(*) FROM deliveries').fetchone()[0] == 0:
         rows = [
             ('Customer 001', 'GRA Phase 2', 4.8156, 7.0498),
@@ -138,34 +134,12 @@ def matrix(points):
 def route_distance(order, m):
     return sum(m[order[i]][order[i + 1]] for i in range(len(order) - 1))
 
-def two_opt(route, m):
-    best = route
-    best_dist = route_distance(best, m)
-    improved = True
-    while improved:
-        improved = False
-        for i in range(1, len(route) - 2):
-            for j in range(i + 1, len(route) - 1):
-                if j - i == 1:
-                    continue
-                new_route = route[:i] + route[i:j][::-1] + route[j:]
-                new_dist = route_distance(new_route, m)
-                if new_dist < best_dist:
-                    best = new_route
-                    best_dist = new_dist
-                    improved = True
-                    route = new_route
-                    break
-            if improved:
-                break
-    return best, best_dist
-
 def exact_tsp(points):
     n = len(points)
     if n <= 1:
         return list(range(n)), 0.0
-    if n > 11:  # 1 Depot + 10 delivery stops max for exact permutations
-        raise ValueError('Exact TSP is limited to 10 delivery stops.')
+    if n > 10:
+        raise ValueError('Exact TSP is limited to 10 stops in this demonstration.')
     m = matrix(points)
     best = None
     bd = float('inf')
@@ -190,19 +164,18 @@ def nearest_neighbor_tsp(points):
         o.append(nxt)
         left.remove(nxt)
     o.append(0)
-    # Refine NN route with 2-Opt algorithm
-    return two_opt(o, m)
+    return o, route_distance(o, m)
 
 def optimize_points(points, algo='auto'):
     if len(points) < 2:
         return list(range(len(points))), 0.0, 'Not applicable'
-    if algo == 'exact' and len(points) <= 11:
+    if algo == 'exact' and len(points) <= 10:
         o, d = exact_tsp(points)
         return o, d, 'Exact TSP'
     if algo == 'nearest':
         o, d = nearest_neighbor_tsp(points)
         return o, d, 'Nearest Neighbour'
-    if len(points) <= 11:
+    if len(points) <= 10:
         o, d = exact_tsp(points)
         return o, d, 'Exact TSP'
     o, d = nearest_neighbor_tsp(points)
@@ -277,13 +250,11 @@ def dashboard():
         day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
         cnt = c.execute("SELECT COUNT(*) FROM deliveries WHERE substr(created_at,1,10)=?", (day,)).fetchone()[0]
         days.append({'label': datetime.strptime(day, '%Y-%m-%d').strftime('%a'), 'count': cnt})
-    
     def fmt_num(n):
         try:
             return '{:,}'.format(int(n))
         except (ValueError, TypeError):
             return n
-
     max_day = max([d['count'] for d in days] + [1])
     for d in days:
         d['pct'] = max(6, round(d['count'] / max_day * 100))
@@ -326,6 +297,7 @@ def delete_rider(rider_id):
     flash('Rider deleted.', 'success')
     return redirect(url_for('riders'))
 
+# ==================== NEW ROUTES ====================
 @app.route('/riders/<int:rider_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_rider(rider_id):
@@ -361,6 +333,7 @@ def view_rider(rider_id):
         flash('Rider not found', 'danger')
         return redirect(url_for('riders'))
     return render_template('view_rider.html', rider=rider)
+# ====================================================
 
 @app.route('/deliveries', methods=['GET', 'POST'])
 @login_required
@@ -400,18 +373,13 @@ def api_optimize():
     p = request.get_json(force=True)
     ids = [int(x) for x in p.get('delivery_ids', [])]
     algo = p.get('algorithm', 'auto')
-    
-    if len(ids) < 1:
-        return jsonify(error='Select at least one delivery location.'), 400
-
+    if len(ids) < 2:
+        return jsonify(error='Select at least two delivery locations.'), 400
     ph = ','.join('?' * len(ids))
     rows = db().execute(f'SELECT * FROM deliveries WHERE id IN ({ph})', ids).fetchall()
     by = {r['id']: r for r in rows}
     rows = [by[i] for i in ids if i in by]
-    
-    # Critical Fix: Prepend the Depot as Index 0
-    points = [DEPOT_COORDS] + [(r['latitude'], r['longitude']) for r in rows]
-    
+    points = [(r['latitude'], r['longitude']) for r in rows]
     before = list(range(len(points))) + [0]
     bd = route_distance(before, matrix(points))
     t = time.perf_counter()
@@ -442,18 +410,16 @@ def api_optimize():
                 'is_depot_end': True
             })
         else:
-            # Map index offset back to delivery rows (-1 due to Depot at index 0)
-            delivery_row = rows[i - 1]
             route_inner.append({
-                'id': delivery_row['id'],
-                'customer_name': delivery_row['customer_name'],
-                'address': delivery_row['address'],
-                'latitude': delivery_row['latitude'],
-                'longitude': delivery_row['longitude']
+                'id': rows[i]['id'],
+                'customer_name': rows[i]['customer_name'],
+                'address': rows[i]['address'],
+                'latitude': rows[i]['latitude'],
+                'longitude': rows[i]['longitude']
             })
 
-    saved = max(0.0, bd - d)
-    imp = (saved / bd * 100) if bd else 0
+    saved = bd - d
+    imp = saved / bd * 100 if bd else 0
     algo_label = used
     if 'Exact' in algo_label:
         algo_label = 'Exact TSP (Brute-Force)'
@@ -462,13 +428,11 @@ def api_optimize():
 
     db().execute(
         'INSERT INTO route_history(algorithm,stop_count,total_distance,execution_ms,route_json,created_at) VALUES(?,?,?,?,?,?)',
-        (used, len(points) - 1, d, ms, json.dumps(route_inner), datetime.now().isoformat(timespec='seconds'))
+        (used, len(points), d, ms, json.dumps(route_inner), datetime.now().isoformat(timespec='seconds'))
     )
     db().commit()
-    
     est_minutes = round(d / AVG_SPEED_KMH * 60)
-    date_label = datetime.now().strftime('%b %d, %Y')
-    
+    date_label = datetime.now().strftime('%b %-d, %Y')
     return jsonify(
         route=route_inner,
         algorithm=algo_label,
@@ -478,7 +442,7 @@ def api_optimize():
         improvement=round(imp, 2),
         execution_ms=round(ms, 3),
         estimated_minutes=est_minutes,
-        total_stops=len(points) - 1,
+        total_stops=len(points),
         date=date_label,
         depot_name=DEPOT_NAME,
         depot_latitude=DEPOT_COORDS[0],
@@ -512,6 +476,11 @@ def users():
 def settings():
     flash('Settings module coming soon.', 'info')
     return redirect(url_for('dashboard'))
+
+# @app.route('/backend')
+# @login_required
+# def backend():
+#     return render_template('backend.html')
 
 with app.app_context():
     init_db()

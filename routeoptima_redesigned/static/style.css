@@ -74,6 +74,16 @@ a{color:var(--primary);text-decoration:none}
    Specific rules below (sidebar, stat-card, search-box) still win
    via higher specificity. */
 svg{width:1em;height:1em;display:inline-block;vertical-align:-0.15em}
+/* Leaflet draws its route lines and marker layers through its own
+   internal <svg> panes — the blanket rule above must not touch those,
+   or the polylines render clipped to almost nothing. */
+.leaflet-container svg,
+.leaflet-pane svg,
+.leaflet-overlay-pane svg,
+.leaflet-marker-pane svg,
+.custom-pin svg{
+  width:auto;height:auto;display:block;vertical-align:baseline;
+}
 
 /* ---------- Focus visibility ---------- */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.btn:focus-visible{
@@ -781,40 +791,22 @@ table.data tr:hover td{background:#fbfbfe}
 /* ============================================================
    Optimize Route v2 — match 4.4/4.5 figures
    ============================================================ */
-.grid-split {
-  grid-template-columns: 1.05fr 1fr;
-  align-items: stretch;
-  min-height: 720px;
-}
-.grid-split > * {
-  min-height: 720px;
-}
-.map-col {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 720px !important;
-  height: 720px;
-}
 .map-wrap {
   position: relative;
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 720px !important;
-  height: 720px;
+  height: 100%;
+  min-height: 480px;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
-  background: #e6ecf2;
+  background: var(--bg);
 }
-#map, #map2 {
-  height: 720px !important;
-  min-height: 720px !important;
+.map-wrap #map,
+.map-wrap #map2 {
+  height: 100%;
+  min-height: 480px;
   width: 100%;
 }
 .leaflet-container {
-  height: 720px !important;
-  width: 100%;
   background: #e6ecf2;
   font-family: 'Plus Jakarta Sans', sans-serif;
 }

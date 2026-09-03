@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% import '_icons.html' as ic %}
+{% block content %}
+
+<div class="card card-pad" style="max-width:600px">
+  <div class="section-title">
+    <div>
+      <h2>Rider Details</h2>
+      <p>View rider information</p>
+    </div>
+  </div>
+
+  <div style="display:grid; gap:16px;">
+    <div>
+      <div class="f-label">Name</div>
+      <div style="font-size:18px; font-weight:700;">{{ rider.name }}</div>
+    </div>
+
+    <div>
+      <div class="f-label">Phone</div>
+      <div class="mono">{{ rider.phone }}</div>
+    </div>
+
+    <div>
+      <div class="f-label">Vehicle</div>
+      <div>{{ rider.vehicle or '—' }}</div>
+    </div>
+
+    <div>
+      <div class="f-label">Status</div>
+      <div>
+        {% if rider.status == 'Available' %}
+          <span class="badge badge-green">Online</span>
+        {% elif rider.status == 'On Delivery' %}
+          <span class="badge badge-amber">On Delivery</span>
+        {% else %}
+          <span class="badge badge-grey">Offline</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div>
+      <div class="f-label">Coordinates</div>
+      <div class="mono">{{ rider.latitude }}, {{ rider.longitude }}</div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:12px; margin-top:30px;">
+    <a href="{{ url_for('edit_rider', rider_id=rider.id) }}" class="btn btn-primary">Edit Rider</a>
+    <a href="{{ url_for('riders') }}" class="btn btn-outline">Back to Riders</a>
+  </div>
+</div>
+
+{% endblock %}

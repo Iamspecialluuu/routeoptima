@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid grid-2">
+  <div class="card layer-card">
+    <span class="tag badge-blue" style="background:var(--info-bg);color:var(--info)">Application Layer</span>
+    <h3 style="font-size:16px">Flask</h3>
+    <p style="color:var(--text-muted);font-size:13.6px">Handles authentication, CRUD operations for riders and deliveries, the optimization API, and route history logging.</p>
+  </div>
+  <div class="card layer-card">
+    <span class="tag" style="background:var(--success-bg);color:var(--success)">Optimization Layer</span>
+    <h3 style="font-size:16px">TSP Engine</h3>
+    <p style="color:var(--text-muted);font-size:13.6px">Haversine distance, a full distance matrix, Exact TSP (brute-force for ≤10 stops), and Nearest Neighbour for larger stop counts.</p>
+  </div>
+  <div class="card layer-card">
+    <span class="tag" style="background:var(--warning-bg);color:var(--warning)">Data Layer</span>
+    <h3 style="font-size:16px">SQLite</h3>
+    <p style="color:var(--text-muted);font-size:13.6px">Stores administrators, riders, deliveries, and every route optimization run for historical reporting.</p>
+  </div>
+  <div class="card layer-card">
+    <span class="tag" style="background:var(--primary-50);color:var(--primary-700)">Presentation Layer</span>
+    <h3 style="font-size:16px">Jinja + JS</h3>
+    <p style="color:var(--text-muted);font-size:13.6px">Server-rendered templates with a lightweight JS layer for the live map and optimization results.</p>
+  </div>
+</div>
+{% endblock %}

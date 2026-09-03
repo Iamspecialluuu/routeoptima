@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block public %}
+<div class="auth-wrap">
+  <svg class="path-decor" viewBox="0 0 800 600" preserveAspectRatio="none">
+    <path class="dash-path" d="M-20 480 C 150 380, 250 520, 420 400 S 650 200, 840 260" fill="none" stroke="#8b93ff" stroke-width="2"/>
+    <circle cx="-20" cy="480" r="5" fill="#8b93ff"/>
+    <circle cx="420" cy="400" r="5" fill="#c6a8ff"/>
+    <circle cx="840" cy="260" r="5" fill="#8b93ff"/>
+  </svg>
+
+  <div class="auth-card">
+    <div class="brand-row"><div class="mark">R</div><span>RouteOptima</span></div>
+    <h1>Admin Login</h1>
+    <p class="sub">Sign in to your dispatch console</p>
+
+    {% with messages=get_flashed_messages(with_categories=true) %}
+      {% for c,m in messages %}<div class="flash flash-{{c}}" style="background:rgba(224,64,90,.15);color:#ffb4c2;border-color:rgba(224,64,90,.3)">{{m}}</div>{% endfor %}
+    {% endwith %}
+
+    <form method="post">
+      <div class="field">
+        <label for="username">Username</label>
+        <input class="mono" id="username" name="username" placeholder="admin" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button class="btn-auth" type="submit">Login</button>
+    </form>
+
+    <!-- <div class="demo-chip">Demo credentials: <strong class="mono">admin</strong> / <strong class="mono">admin123</strong></div> -->
+    <div class="auth-foot">&copy; 2025 RouteOptima Dispatch System</div>
+  </div>
+</div>
+{% endblock %}

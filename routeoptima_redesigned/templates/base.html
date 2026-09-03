@@ -18,9 +18,8 @@
       <a href="{{url_for('dashboard')}}" class="{{'active' if request.endpoint in ['dashboard']}}">{{ic.icon('dashboard')}}Dashboard</a>
       <a href="{{url_for('riders')}}" class="{{'active' if request.endpoint in ['riders','add_rider_page','edit_rider','view_rider']}}">{{ic.icon('riders')}}Riders</a>
       <a href="{{url_for('deliveries')}}" class="{{'active' if request.endpoint=='deliveries'}}">{{ic.icon('deliveries')}}Deliveries</a>
-      <a href="{{url_for('optimize')}}" class="{{'active' if request.endpoint in ['routes','optimize']}}">{{ic.icon('optimize')}}Optimize Route</a>
-      <a href="{{url_for('history')}}" class="{{'active' if request.endpoint=='history'}}">{{ic.icon('history')}}History</a>
-      <a href="{{url_for('reports')}}" class="{{'active' if request.endpoint=='reports'}}">{{ic.icon('reports')}}Reports</a>
+      <a href="{{url_for('routes')}}" class="{{'active' if request.endpoint in ['routes','optimize']}}">{{ic.icon('routes')}}Routes</a>
+      <a href="{{url_for('history')}}" class="{{'active' if request.endpoint in ['history']}}">{{ic.icon('history')}}History</a>
       <a href="{{url_for('users')}}" class="{{'active' if request.endpoint=='users'}}">{{ic.icon('users')}}Users</a>
       <a href="{{url_for('settings')}}" class="{{'active' if request.endpoint=='settings'}}">{{ic.icon('settings')}}Settings</a>
     </nav>

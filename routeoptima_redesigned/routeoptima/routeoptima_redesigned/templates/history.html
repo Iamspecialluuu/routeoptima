@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="table-card">
+  <div class="table-toolbar">
+    <div><strong style="font-size:14px">Route optimization runs</strong></div>
+    <span class="badge badge-blue">{{history|length}} total</span>
+  </div>
+  <table class="data">
+    <tr><th>#</th><th>Date</th><th>Stops</th><th>Distance</th><th>Time</th><th>Algorithm</th></tr>
+    {% for h in history %}
+    <tr>
+      <td>{{loop.index}}</td>
+      <td>{{h.created_at}}</td>
+      <td>{{h.stop_count}}</td>
+      <td style="font-weight:700">{{h.total_distance}} km</td>
+      <td>{{h.execution_ms}} ms</td>
+      <td><span class="badge badge-blue">{{h.algorithm}}</span></td>
+    </tr>
+    {% else %}
+    <tr class="empty-row"><td colspan="6">No route history yet — run an optimization from the Optimize Route page.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
